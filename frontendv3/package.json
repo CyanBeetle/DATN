@@ -1,0 +1,56 @@
+{
+  "name": "specialized-fe",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@ant-design/charts": "^2.3.0",
+    "@ant-design/icons": "^5.6.1",
+    "@ant-design/nextjs-registry": "^1.0.2",
+    "@ant-design/plots": "^2.1.5",
+    "@next/env": "^15.2.4",
+    "@react-google-maps/api": "^2.20.6",
+    "@tailwindcss/postcss": "^4.0.7",
+    "antd": "^5.24.0",
+    "axios": "^1.9.0",
+    "hls.js": "^1.5.20",
+    "js-cookie": "^3.0.5",
+    "konva": "^9.3.20",
+    "leaflet": "^1.9.4",
+    "leaflet-routing-machine": "^3.2.12",
+    "leaflet.heat": "^0.2.0",
+    "lodash.debounce": "^4.0.8",
+    "next": "15.1.7",
+    "postcss": "^8.5.2",
+    "qs": "^6.14.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.0.1",
+    "react-konva": "^19.0.3",
+    "react-leaflet": "^5.0.0",
+    "react-markdown": "^10.1.0",
+    "react-player": "^2.16.0",
+    "tailwindcss": "^4.0.7",
+    "use-image": "^1.1.1",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9",
+    "eslint-config-next": "15.1.7"
+  },
+  "resolutions": {
+    "glob": "^10.3.10",
+    "inflight": "npm:@isaacs/inflight@^1.0.0"
+  },
+  "overrides": {
+    "glob": "^10.3.10",
+    "inflight": "npm:@isaacs/inflight@^1.0.0"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "7hto8h(1)_20250428_023542_analysis.json": {
+    "modified_time": 1745841167.5243058,
+    "processed_date": "2025-04-30 03:35:24",
+    "vehicle_count": 7525,
+    "valid_speed_count": 4245,
+    "time_offset": 0,
+    "max_time": 2091.611869122807
+  },
+  "7hto8h(2)_20250428_034129_analysis.json": {
+    "modified_time": 1745841167.6313045,
+    "processed_date": "2025-04-30 03:35:24",
+    "vehicle_count": 7143,
+    "valid_speed_count": 4220,
+    "time_offset": 2091.611869122807,
+    "max_time": 1507.0060724753175
+  },
+  "8hto9h(1)_20250428_051259_analysis.json": {
+    "modified_time": 1745841167.7452931,
+    "processed_date": "2025-04-30 03:35:24",
+    "vehicle_count": 8270,
+    "valid_speed_count": 5133,
+    "time_offset": 3598.6179415981246,
+    "max_time": 2091.6128688995213
+  },
+  "8hto9h(2)_20250428_061857_analysis.json": {
+    "modified_time": 1745841167.8163786,
+    "processed_date": "2025-04-30 03:35:24",
+    "vehicle_count": 5064,
+    "valid_speed_count": 3096,
+    "time_offset": 5690.2308104976455,
+    "max_time": 1507.0161413837368
+  },
+  "9hto10h (1)_20250428_075051_analysis.json": {
+    "modified_time": 1745841167.9022896,
+    "processed_date": "2025-04-30 03:35:24",
+    "vehicle_count": 6128,
+    "valid_speed_count": 3848,
+    "time_offset": 7197.246951881382,
+    "max_time": 2091.609869569378
+  },
+  "9hto10h (2)_20250428_085646_analysis.json": {
+    "modified_time": 1745841167.9613733,
+    "processed_date": "2025-04-30 03:35:24",
+    "vehicle_count": 4011,
+    "valid_speed_count": 2608,
+    "time_offset": 9288.856821450761,
+    "max_time": 1507.0118035951475
+  }
+}

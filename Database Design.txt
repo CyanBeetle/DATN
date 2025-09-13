@@ -1,0 +1,163 @@
+DATABASE DESIGN - URBAN TRAFFIC MONITORING SYSTEM
+
+Database Design (MongoDB - Based on Pydantic Models)
+
+I. Main Collections and Document Structure (Finalized for Use Cases):
+
+1.  `users` Collection (Stores user information)
+    *   Description: Corresponds to the `UserInDB` Pydantic model.
+    *   Main Fields:
+        *   `username`: String (unique, required)
+        *   `email`: String (unique, required)
+        *   `hashed_password`: String (required)
+        *   `role`: Enum ["user", "admin"] (required)
+        *   `display_name`: String (optional)  # Primary field for user's shown name.
+        *   `token_version_changed_at`: Datetime (Optional)
+        *   `created_at`, `updated_at`: Datetime
+        # Note: UserInDB model also includes is_active, last_login, token_version for system use.
+    *   Indexes: `username`, `email`
+
+2.  `cameras` Collection (Stores camera information)
+    *   Description: Corresponds to the `CameraInDB` Pydantic model.
+    *   Main Fields:
+        *   `name`: String (required)
+        # *   `location_id`: ObjectId (references `locations`) # Old field
+        # *   `location`: Embedded Object (Corresponds to LocationDBModel) # Old field
+        *   `location_id`: ObjectId (Optional, references `locations` collection, required for camera to be geolocated)
+        *   `roi_config`: Object (embedded, required; predetermined coordinates and size relative to the camera frame, used for vehicle counting only)
+        *   `status`: Enum ["Active", "Inactive", "Maintenance"] (required)
+        *   `online`: Boolean (required)
+        *   `deleted`: Boolean (default: false)
+        *   `stream_url`: String (required)
+        *   `updated_at`: Datetime (Default: current UTC time)
+        # Note: congestion_level, last_vehicle_count, last_detection_time are NOT persisted in this collection.
+        # They are calculated on-demand or retrieved from a short-lived cache for API responses.
+    *   Indexes: `name`, `status`, `online`, `deleted`, `location_id`
+
+3.  `favorite_cameras` Collection (Stores user's favorite cameras)
+    *   Description: Corresponds to the `FavoriteCamera` Pydantic model. This acts as a join/linking collection.
+    *   Main Fields:
+        *   `user_id`: ObjectId (references `users`)
+        *   `camera_id`: ObjectId (references `cameras`)
+        *   `notifications_enabled`: Boolean (Optional, Default: false)
+        *   `created_at`: Datetime # Was added_at
+    *   Indexes: `(user_id, camera_id)`
+
+4.  `locations` Collection (Stores geographic location information) # NEW COLLECTION
+    *   Description: Stores distinct geographic locations referenced by other collections (e.g., cameras, reports).
+    *   Main Fields:
+        *   `name`: String (optional, e.g., "Main Street Intersection")
+        *   `latitude`: Double (required)
+        *   `longitude`: Double (required)
+        *   `created_at`, `updated_at`: Datetime
+    *   Indexes: `(latitude, longitude)`, `name`
+
+5.  `traffic_data_logs` Collection (Stores historical and batch-processed traffic data)
+    *   Note: Real-time, on-demand congestion data (frame, vehicle count, congestion state) is NOT persisted. For each camera, only the latest result is calculated/cached and served on request, and is not saved in the database. 
+    This collection is reserved for future use (e.g., batch analytics, offline processing, or historical studies).
+    *   Main Fields:
+        *   `camera_id`: ObjectId (references `cameras`)
+        *   `timestamp`: Datetime
+        *   `vehicle_count`: Integer
+        *   `density`: Double (vehicle per 100 square meter)
+        *   `congestion_level`: Integer (1-5)
+    *   Indexes: `camera_id`, `timestamp`
+
+6.  `prediction_models` Collection (Stores prediction model information)
+    *   Main Fields:
+        *   `name`: String
+        *   `algorithm`: Enum ["ARIMA", "LSTM", "BiLSTM"]
+        *   `status`: Enum ["training", "active", "inactive", "default", "failed", "deleted"]
+        *   `performance_metrics`: Object (RMSE, MAE, R², etc.)
+        *   `training_data_id`: ObjectId (references `training_datasets`)
+        *   `version`: String
+        *   `created_at`, `last_trained_at`: Datetime
+        *   `config`: Object (hyperparameters, etc.)
+    *   Indexes: `status`, `algorithm`, `version`
+
+7.  `forecasts` Collection (Stores traffic forecast results)
+    *   Main Fields:
+        *   `location_id`: ObjectId (references `locations`)
+        *   `model_id`: ObjectId (references `prediction_models`)
+        *   `input_params`: Object (horizon, weather, etc.)
+        *   `forecast_time`: Datetime
+        *   `predicted_density`: Array[Double] (Vehicle count)
+        *   `predicted_speed`: Array[Double] (km/h)
+        *   `congestion_levels`: Array[Integer] 
+        *   `confidence_intervals`: Array[Double] 
+        *   `created_at`: Datetime
+    *   Indexes: `location_id`, `model_id`, `forecast_time`
+
+8.  `reports` Collection (Stores reports and feedback from users)
+    *   Main Fields:
+        *   `user_id`: ObjectId (references `users`) # Was created_by
+        *   `type`: Enum ["incident", "infrastructure"] # Aligned with model's ReportTypeLiteral
+        *   `description`: String
+        *   `status`: Enum ["New", "Processing", "Verified", "Invalid", "Resolved", "Rejected", "Archived"] # Aligned with model's ReportStatusLiteral
+        *   `admin_reply`: String (optional) # Was resolution_notes
+        # *   `location_id`: ObjectId (references `locations`, optional) # Old field
+        *   `location_id`: ObjectId (Optional, references `locations` collection)
+        *   `image_url`: String (optional)
+        *   `submitted_at`: Datetime # Was created_at
+        *   `processed_at`: Datetime (optional)
+        # Note: ReportInDB also includes title, created_by_username, handled_by_admin_id
+    *   Indexes: `status`, `type`, `user_id`, `submitted_at`, `location_id`
+
+9.  `training_datasets` Collection (Stores information about training datasets)
+    *   Main Fields:
+        *   `name`: String
+        *   `location_id`: ObjectId (references `locations`)
+        *   `date_time`: Datetime
+        *   `roi_config`: Object
+        *   `fps`: Integer
+        *   `version`: String
+        *   `quality_score`: Double
+        *   `status`: Enum ["uploaded", "processing", "ready", "error"]
+        *   `processed_data_url`: String
+        *   `metadata`: Object (raw file info, etc.)
+        *   `created_at`, `updated_at`: Datetime
+    *   Indexes: `status`, `location_id`, `version`
+
+10. `video_tasks` Collection (Stores video processing task information)
+    *   Main Fields:
+        *   `task_id`: String (unique)
+        *   `dataset_id`: ObjectId (references `training_datasets`)
+        *   `status`: Enum ["pending", "processing", "completed", "failed"]
+        *   `progress`: Double (0-100)
+        *   `result_url`: String (optional)
+        *   `created_at`, `updated_at`: Datetime
+    *   Indexes: `task_id`, `dataset_id`, `status`
+
+11. `report_notifications` Collection (Stores notifications for admins about new reports)
+    *   Main Fields:
+        *   `report_id`: ObjectId (references `reports`)
+        *   `admin_id`: ObjectId (references `users`, specifically an admin user)
+        *   `read`: Boolean (default: false)
+        *   `created_at`: Datetime
+        # Note: ReportNotificationInDB also includes report_title, report_type, message for context.
+    *   Indexes: `admin_id`, `read`
+
+II. Embedding vs. Referencing Decisions - Summary:
+
+*   Embedding is preferred for:
+    *   ROI configuration within `cameras` and `training_datasets`.
+*   Referencing is used for:
+    *   User, camera, location, and model relationships across collections.
+    *   `location_id` in `cameras` and `reports` now references the new `locations` collection.
+
+III. Data Types:
+
+*   Utilizes basic MongoDB/BSON data types such as String, NumberInt, NumberLong, Double, Boolean, Date, ObjectId, Array, and Object (for embedded fields).
+*   Enum fields in Pydantic models will be stored as Strings in MongoDB.
+
+IV. Indexes:
+
+*   In addition to the indexes already created in `db/session.py` (`users.username`, `users.email`, `video_tasks.task_id`, `cameras.name`, `favorite_cameras.(user_id, camera_id)`, `locations.(latitude, longitude)`), further indexes should be considered and created for frequently queried fields to optimize performance, as listed above for each collection.
+
+V. Versioning, Status Tracking, and Metadata:
+
+*   All collections supporting ML/data processing (training_datasets, prediction_models, forecasts) include version, status, and metadata fields for traceability and reproducibility.
+*   Reports and cameras include status and deletion fields for robust admin management.
+*   All time-series and log data (traffic_data_logs, chatbot_logs) are indexed by timestamp for efficient querying.
+
+This design is now fully aligned with the finalized use cases and system requirements. It supports all user/admin actions, ML/forecasting workflows, and robust data management for the Urban Traffic Monitoring and Prediction System.

@@ -1,0 +1,108 @@
+# Backend API Endpoints
+
+## Global Endpoints (defined in backendv3/app/main.py)
+- GET /
+- GET /health
+- Static file mounts:
+  - /assets/* (serves files from backendv3/assets)
+  - /static/* (serves files from backendv3/static)
+
+## Authentication Endpoints (from backendv3/auth/router.py with prefix /api/auth)
+- POST /api/auth/login
+- POST /api/auth/refresh
+- GET /api/auth/me
+- PUT /api/auth/me/password
+- POST /api/auth/register
+- POST /api/auth/logout
+
+## User & Admin Endpoints (all endpoints accessible to users are also accessible to admins)
+# The following /api/users endpoints for authentication are now handled by /api/auth:
+# - POST /api/users/login (Use /api/auth/login)
+# - POST /api/users/refresh (Use /api/auth/refresh)
+# - GET /api/users/me (Use /api/auth/me)
+# - PUT /api/users/me/password (Use /api/auth/me/password)
+# - POST /api/users/register (Use /api/auth/register)
+# - POST /api/users/logout (Use /api/auth/logout)
+
+## Camera Endpoints
+- GET /api/cameras
+- GET /api/cameras/{camera_id}
+- GET /api/admin/cameras
+- POST /api/admin/cameras
+  - Body: `name` (string, required), `stream_url` (HttpUrl, required), `status` (string, required, e.g., "Active"), `description` (string, optional), 
+  - `location_id` (string, optional, ObjectId of an existing location), OR 
+  - `location_data` (object, optional, to create a new location): 
+    - `latitude` (float, required in location_data)
+    - `longitude` (float, required in location_data)
+    - `name` (string, optional in location_data)
+  - Note: Provide `location_id` OR `location_data`, not both. If neither, camera has no specific location.
+- GET /api/admin/cameras/{camera_id}
+- PUT /api/admin/cameras/{camera_id}
+  - Body: Can include `name`, `stream_url`, `status`, `description`, `location_id`, or `location_data` (similar to POST).
+- DELETE /api/admin/cameras/{camera_id}
+- PUT /api/admin/cameras/{camera_id}/status
+- PUT /api/admin/cameras/{camera_id}/roi
+- GET /api/admin/cameras/{camera_id}/capture-frame
+- POST /api/cameras/refresh-all-thumbnails
+- POST /api/cameras/calculate-all-congestion
+
+## Favorites Endpoints
+- GET /api/user/favorites
+- POST /api/user/favorites
+- DELETE /api/user/favorites/{camera_id}
+- GET /api/user/favorites/check/{camera_id}
+
+## Report Endpoints
+- POST /api/reports
+  - Body (multipart/form-data):
+    - `report_title` (string, required)
+    - `report_description` (string, required)
+    - `report_type` (string, required, e.g., "incident", "infrastructure")
+    - `location_id` (string, optional, ObjectId of an existing location)
+    - `location_name` (string, optional, if creating new location)
+    - `location_latitude` (float, optional, if creating new location)
+    - `location_longitude` (float, optional, if creating new location)
+    - `image` (file, optional)
+  - Note: For location, provide `location_id` OR (`location_latitude` AND `location_longitude`, with optional `location_name`).
+- GET /api/reports/my-reports
+- GET /api/reports/{report_id}
+- GET /api/admin/reports
+- PATCH /api/admin/reports/{report_id}
+- GET /api/admin/notifications
+- PATCH /api/admin/notifications/{notification_id}/read
+
+## Training Data Management Endpoints
+- POST /api/admin/training-data/upload
+- GET /api/admin/training-data/
+- GET /api/admin/training-data/{dataset_id}
+- DELETE /api/admin/training-data/{dataset_id}
+- POST /api/admin/training-data/{dataset_id}/initiate-video-processing
+- POST /api/admin/training-data/initiate-ml-dataset-creation
+
+## Prediction Model Management Endpoints
+- POST /api/admin/prediction-models/
+- GET /api/admin/prediction-models/
+- GET /api/admin/prediction-models/{model_id}
+- PUT /api/admin/prediction-models/{model_id}
+- DELETE /api/admin/prediction-models/{model_id}
+- POST /api/admin/prediction-models/{model_id}/initiate-retraining
+- POST /api/admin/prediction-models/{model_id}/set-default
+
+## Traffic Forecast Endpoints
+- GET /api/forecasts/
+  - Description: Retrieves traffic forecasts for a fixed location ("Đường Mai Chí Thọ - đầu hầm Thủ Thiêm") using the default prediction model. Query: time_horizon_minutes, location_name (optional, currently ignored).
+
+## Video Processing Endpoints
+- POST /api/video/process-video/
+- GET /api/video/task-status/{task_id}
+- GET /api/video/processed-data/{task_id}
+
+## General Utility Endpoints
+- GET /api/utils/system-status
+- POST /api/utils/cleanup-old-data
+
+# Notes:
+- Admin is a super user: all user endpoints are accessible to admin, but not all admin endpoints are accessible to users.
+- Camera metadata includes ROI config for vehicle counting; effect radius for overlays is computed on the frontend.
+- Real-time congestion data is not persisted; only batch/processed data is stored for analytics and ML.
+- All endpoints and models should be cross-checked with the finalized Database Design, System Specification, and Use Case Description for consistency.

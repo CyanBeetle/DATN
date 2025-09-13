@@ -1,0 +1,376 @@
+USE CASE DESCRIPTION - URBAN TRAFFIC MONITORING SYSTEM
+
+
+
+Here is the list of 14 main functionalities.
+Functional Requirements:
+
+User: End-users who utilize basic functions to monitor, receive information, find routes, interact, and receive support related to traffic.
+Admin: System administrators who possess all User permissions plus additional rights to manage foundational data, prediction models, camera devices, and process user feedback.
+
+Authentication and Authorization
+
+UC01: System Login
+Description: All users (User and Admin) must log in to access system functions. The system authenticates login information (username/email and password) against the user database. Upon successful authentication, the system will display the appropriate interface and functions corresponding to the user's role (User or Admin).
+Note: While the system does not offer a user-facing self-registration interface, user accounts are created and managed via dedicated backend API endpoints (e.g., `/api/auth/register`). This allows for administrative account creation or integration with other provisioning processes.
+Common Functions (For both User and Admin)
+
+UC02: View Traffic Map
+Description: Display an interactive digital map using Leaflet with a real-time traffic density overlay (heatmap). 
+Allows zooming, panning, moving the map. For congestion overlays (heatmap) and route warnings (UC03), the frontend uses a dynamic effect radius around each camera marker. This effect radius is distinct from the camera's ROI (which is used by the backend for vehicle counting only) and its size increases with congestion severity.
+Prerequisite: UC01 (System Login).
+UC03: Find Route
+Description: Allows users to input starting and destination points to find an optimal travel route. Users can input points by typing addresses (with geocoding) or by clicking on the map to place markers. The system uses Leaflet's default client-side routing capabilities to suggest a route. It warns the user if the suggested route passes through the dynamic effect radius of a camera location experiencing congestion level 3 or higher. The effect radius is determined by the frontend based on congestion severity.
+Prerequisite: UC02 (View Traffic Map). The user must be on the map interface to activate the route finding function.
+UC04: View Real-time Camera
+Description: Allows users to select and view live images (video stream) from traffic cameras installed and integrated into the system. The ROI (predetermined coordinates and size) is used for vehicle counting only, not for map overlays.
+Prerequisite: UC01 (System Login).
+UC05: Manage Favorite Cameras
+Description: Allows users to mark one or more cameras as "favorite". The system saves this list for each user. The system will automatically send notifications to the user when traffic density at the location of favorite cameras exceeds a predefined congestion threshold. The ROI is used for vehicle counting; the effect radius is used for map-based alerts.
+Prerequisite: UC01 (System Login). User must be able to select a camera (e.g., from a list, map, or stream view) to mark it as favorite.
+UC06: View Traffic Forecast
+Description: Displays traffic condition forecast information for specific areas (initially a fixed location, potentially expandable). 
+Users can select a forecast time horizon (e.g., 15 minutes, 1 hour, 2 hours, 6 hours). 
+The system utilizes a pre-trained Keras machine learning model and an associated scaler file (.pkl), specific to the selected time horizon, to generate the forecast. 
+Input data for the model is prepared by the backend. The forecast, including predicted congestion levels or traffic speed, is presented to the user, typically as a time-series chart.
+Prerequisite: UC01 (System Login).
+UC07: View News & Weather
+Description: Provides an area displaying the latest urban traffic-related news, announcements from authorities, and weather forecast information for areas of user interest or their current location.
+Prerequisite: UC01 (System Login).
+UC08: Manage Personal Account
+Description: Allows users to view and update basic personal information that is permitted to be changed, e.g., display name, login password.
+Prerequisite: UC01 (System Login).
+UC09: Submit Report/Feedback
+Description: Provides a form allowing users to input information and submit reports about ongoing traffic incidents (accidents, unusual congestion, obstacles...) or feedback about infrastructure issues (broken traffic lights, degraded roads...). Can include location on the map and images (if supported).
+Prerequisite: UC01 (System Login).
+UC10: Interact with Support Chatbot
+Description: Provides a chat interface allowing users (User and Admin) to ask questions or request support regarding application usage, basic traffic information, or common issues. The chatbot will attempt to answer automatically based on its trained knowledge base.
+Prerequisite: UC01 (System Login).
+Admin-Specific Functions (For Admin Role)
+(Admin inherits all Use Cases from UC02 to UC10)
+
+UC11: Access Admin Dashboard
+Description: Allows Admin to access a centralized dashboard for system oversight and operational management. This dashboard replaces the previous "Manage Training Data" functionality.
+The Admin Dashboard provides access to:
+    *   System Health Overview: Display key operational metrics and the status of critical system components (e.g., camera connectivity, API service status).
+    *   Camera Management (integrates UC13): View a list of all cameras, add new cameras, edit existing camera details (name, stream URL, ROI, location), change camera status (Active, Inactive, Maintenance), and remove cameras.
+    *   Report Management (integrates UC14): View, process, and manage user-submitted reports and feedback.
+    *   User Management: View a list of registered users and their roles. (Further user management capabilities like editing roles or status can be considered).
+    *   Deployed Forecast Models Overview: List the currently deployed pre-trained forecast models, their versions, associated time horizons (e.g., "15-min-model-v1.2.h5", "1-hour-model-v1.0.keras"), and their status.
+    *   (Future Work) Link to Model Performance Metrics Page: A link or section to navigate to a dedicated page displaying detailed performance metrics of the deployed forecast models (as outlined in the proposal for a metrics viewer page).
+Prerequisite: UC01 (System Login with Admin role).
+
+UC12: Manage and Monitor Deployed Forecast Model Versions (Repurposed)
+Description: (Future Work) Allows Admin to perform detailed lifecycle management and operational monitoring of the deployed pre-trained forecast models. This complements the overview that might exist in UC11 (Admin Dashboard) and provides a dedicated interface for model version control and basic monitoring.
+Key Functions (Proposed for Future Work):
+    1.  Version Management:
+        *   View all uploaded model versions for each specific time horizon (e.g., 15-min, 1-hour, 2-hour, 6-hour).
+        *   Set a specific uploaded model version as the "active" one for making predictions for its designated time horizon.
+    2.  Detailed Metadata Viewing/Editing:
+        *   Access and manage extended metadata for each model file (e.g., upload date, file size, associated scaler, version notes, link to training documentation/metrics).
+    3.  Operational Monitoring (Read-Only):
+        *   Display basic operational statistics for active model versions (e.g., last prediction timestamp, prediction count, error occurrences).
+    4.  (Optional) Archiving/Deleting Old Versions:
+        *   Functionality to archive or delete old, inactive model versions.
+    5.  (Future Work) Model Performance Metrics Viewer:
+        *   Display detailed performance metrics (MAE, RMSE, R2 score, step-wise performance) for each deployed model version, loaded from a metrics file (e.g., `trained_models.pkl`). This could be integrated here or as a separate linked page.
+Prerequisite: UC01 (System Login with Admin role).
+
+UC13: Manage Camera Status
+Description: Allows Admin to view a list of cameras currently managed in the system. Admin can change the status of a camera (e.g., enable/disable display for users, mark for maintenance) or completely remove a camera from the system (e.g., when a device is faulty or relocated).
+Prerequisite: UC01 (System Login with Admin role).
+
+UC14: Process Reports/Feedback
+Description: Displays a list of reports/feedback submitted by users (from UC09). Admin can view the details of each report, verify information. Based on the verification result, Admin can:
+Mark the report as "Verified" (can include automatic or custom reply message to the submitter).
+Mark the report as "Invalid" or "Rejected".
+Update processing status (e.g., "Processing", "Resolved").
+Processed reports will be stored according to regulations or deleted if needed.
+Prerequisite: UC01 (System Login with Admin role).
+
+
+
+
+-----------------------------------------------USE CASE DESCRIPTION --------------------------------------------------
+
+
+1. Use case: System Login (UC01)
+
+Field	Description
+Use Case Name	System Login
+Users	User, Admin
+Description	All users (User and Admin) must log in to access system functions. The system authenticates login information (username/email and password) against the user database. Upon successful authentication, the system will display the appropriate interface and functions corresponding to the user's role (User or Admin).
+Note: While the system does not offer a user-facing self-registration interface, user accounts are created and managed via dedicated backend API endpoints (e.g., `/api/auth/register`). This allows for administrative account creation or integration with other provisioning processes.
+Precondition	User is on the login screen. User account has been created and stored in the database.
+Postcondition	User is successfully logged in and redirected to the main interface corresponding to their role (User or Admin).
+Normal Flow	1. User enters username or email.2. User enters password.br>3. User clicks "Login" button.4. System authenticates login information against the user database.5. If valid, system determines role (User/Admin) and displays appropriate interface.
+Alternative Flow	None.
+Exceptions	- Incorrect login information: System displays an error message.- Database connection error: System displays a system error message.- Account does not exist (due to external management): System displays an error message.
+
+2. Use case: View Traffic Map (UC02)
+
+Field	Description
+Use Case Name	View Traffic Map
+Users	User, Admin
+Description	Display an interactive digital map using Leaflet with a real-time traffic density overlay (heatmap). 
+Allows zooming, panning, moving the map. For congestion overlays (heatmap) and route warnings (UC03), the frontend uses a dynamic effect radius around each camera marker. This effect radius is distinct from the camera's ROI (which is used by the backend for vehicle counting only) and its size increases with congestion severity.
+Precondition	UC01: User has successfully logged in.
+Postcondition	User can view the digital map with updated traffic density information and can interact with the map.
+Normal Flow	1. User accesses the map function (default after login or via menu).2. System loads base map data.3. System (frontend) fetches camera data including congestion levels from the backend.4. Frontend generates and displays a heatmap overlay based on camera congestion levels and their dynamic effect radii.5. User performs zoom in, zoom out, pan actions to view desired area.
+Alternative Flow	None.
+Exceptions	- Error loading map data: Display error message or blank map.- Error loading camera/congestion data: Display map without overlay or error message.- Network connection lost: Cannot load or update data.
+
+3. Use case: Find Route (UC03)
+
+Field	Description
+Use Case Name	Find Route
+Users	User, Admin
+Description	Allows users to input starting and destination points to find an optimal travel route. Users can input points by typing addresses (with geocoding) or by clicking on the map to place markers. The system uses Leaflet's default client-side routing capabilities to suggest a route. It warns the user if the suggested route passes through the dynamic effect radius of a camera location experiencing congestion level 3 or higher. The effect radius is determined by the frontend based on congestion severity.
+Precondition	UC02: User is viewing the traffic map.
+Postcondition	System displays a suggested route on the map, along with warnings (if any) if the route intersects significantly congested areas.
+Normal Flow	1. User activates the route finding function on the map interface.
+2. User enters or selects the starting point (via search/geocode or by clicking on the map to place a marker).3. User enters or selects the destination point (similarly).4. User requests the system to find the route.5. Frontend (using Leaflet routing) calculates the optimal route.6. Frontend displays the route on the map.7. Frontend checks if the route intersects the dynamic effect radius of any camera with congestion level 3 or higher. If so, it displays a warning notification to the user.
+Alternative Flow	None.
+Exceptions	- Location input/selection feature is not working, or geocoding fails.- Cannot find a route between the two points (routing service limitation).- Error in fetching camera congestion data for warnings.
+
+4. Use case: View Real-time Camera (UC04)
+
+Field	Description
+Use Case Name	View Real-time Camera
+Users	User, Admin
+Description	Allows users to select and view live images (video stream with very low fps (1 frame per 8 seconds)) from traffic cameras integrated into the system. The ROI (predetermined coordinates and size) is used for vehicle counting only, not for map overlays.
+Precondition	UC01: User has successfully logged in.
+Postcondition	User can view the real-time video stream from the selected camera.
+Normal Flow	1. User accesses the camera viewing function (via camera icon in menu or selecting camera icon on the map - UC02).2. System displays a list or location of available cameras.3. User selects a specific camera.4. System connects and displays the video stream from that camera.
+Alternative Flow	If viewing the map (UC02), the user can directly select a camera icon on the map to view.
+Exceptions	- Selected camera is inactive or under maintenance.- Error connecting to the video stream source.- User's network connection lost.- Camera does not exist or has been deleted (managed by Admin - UC13).
+
+5. Use case: Manage Favorite Cameras (UC05)
+
+Field	Description
+Use Case Name	Manage Favorite Cameras
+Users	User, Admin
+Description	Allows marking/unmarking cameras as "favorite". System saves the list and sends alerts when favorite cameras exceed congestion threshold. The ROI is used for vehicle counting; the effect radius is used for map-based alerts.
+Precondition	UC01: User has successfully logged in. User must be able to select a camera (e.g., from a list, map, or currently viewing stream) to mark it as favorite.
+Postcondition	The user's list of favorite cameras is updated (added or removed). Congestion alerts are activated/deactivated for the corresponding camera.
+Normal Flow (Add favorite)	1. User finds the camera they want to mark (via list, map, or currently viewing stream).2. User selects the "Mark as favorite" option (by clicking on the gray heart icon).3. System saves this camera to the user's favorite list.4. System starts monitoring traffic density at this camera's location to send alerts.
+Normal Flow (Remove favorite)	1. User accesses the list of favorite cameras or finds a camera they have marked.2. User selects the "Unmark favorite" option (by clicking on the pink heart icon).3. System removes the camera from the user's favorite list.4. System stops monitoring and sending alerts for this camera.
+Alternative Flow	None.
+Exceptions	- Error saving/deleting favorite information to the database.- Error in the alert system (failed to send or sent incorrectly).
+
+6. Use case: View Traffic Forecast (UC06)
+
+Field	Description
+Use Case Name	View Traffic Forecast
+Users	User, Admin
+Description	Displays traffic condition forecast information for specific areas (initially a fixed location, potentially expandable). Users can select a forecast time horizon (e.g., 15 minutes, 1 hour, 2 hours, 6 hours). The system utilizes a pre-trained Keras machine learning model and an associated scaler file (.pkl), specific to the selected time horizon, to generate the forecast. Input data for the model (e.g., recent aggregated traffic patterns) is prepared by the backend. The forecast, including predicted congestion levels or traffic speed, is presented to the user, typically as a time-series chart.
+Prerequisite	UC01 (System Login).
+Postcondition	User can view traffic forecast information for the selected area and time.
+Normal Flow	1. User accesses the traffic forecast function (via the dashboard on the homepage).2. System uses the pre-configured forecast location (e.g., "Đường Mai Chí Thọ - đầu hầm Thủ Thiêm") for which predictions are available.3. User selects the desired forecast time frame (e.g., 30 minutes ahead, 1 hour ahead).4. System queries the prediction model (selected by Admin - UC12) with the chosen parameters.5. System displays the forecast results (e.g., map with forecast colors, forecast graph).
+Alternative Flow	The system can display a general forecast for the entire city or major routes without requiring the user to select specifically.
+Exceptions	- Prediction model is unavailable or currently retraining (UC12).- Error connecting to the forecast service.- Insufficient historical/current data to generate a reliable forecast.
+
+UC06 - VIEW TRAFFIC FORECAST
+───────────────────────────
+PREDICTION CONTROL PANEL
+• Location selection (currently fixed to "Đường Mai Chí Thọ - đầu hầm Thủ Thiêm")
+• Prediction horizon selector with intuitive options:
+  - Short-term (10/30 minutes ahead)
+  - Trend prediction (next few hours (6/12), improving/worsening trend)
+• Configurable visualization preferences
+
+MULTI-VIEW FORECAST VISUALIZATION
+• Primary chart view:
+  - Time-series graph showing predicted traffic speed/density
+  - Color-coded congestion levels with threshold indicators
+  - Confidence intervals showing prediction uncertainty
+• Supplementary visualizations:
+  - Congestion trend indicator (improving/worsening)
+  - Probability distribution for different congestion states
+  - Key metrics summary (expected travel time, peak congestion)
+
+TECHNICAL IMPLEMENTATION
+• Frontend calls the `/forecasts/` endpoint with selected parameters
+• Backend pipeline:
+  - Loads active models selected in UC12 (ARIMA + LSTM/BiLSTM)
+  - Prepares current time as input. About other required feature input: (vehicle_count)
+  Default: Assuming based on similar past time and calculate the average within the timespan to use as input.
+  Non-default: Allow user to choose event (rain and holiday). If both 
+  - Generates predictions for requested time horizon
+  - Combines model outputs based on configured weights
+  - Returns structured prediction data with confidence metrics
+
+7. Use case: View News & Weather (UC07)
+
+Field	Description
+Use Case Name	View News & Weather
+Users	User, Admin
+Description	Displays the latest traffic news and current weather at a predefined area.
+Precondition	UC01: User has successfully logged in.
+Postcondition	User can view a list of traffic-related news and weather information.
+Normal Flow	1. User accesses the "News & Weather" section.
+2. System loads and displays a list of the latest news from configured sources.3. System loads and displays weather information for the predefined location.4. User can choose to read the details of a news item.
+Alternative Flow	None.
+Exceptions	- Error connecting to the news feed source.- Error connecting to the weather information service.- Network connection lost.
+
+8. Use case: Manage Personal Account (UC08)
+
+Field	Description
+Use Case Name	Manage Personal Account
+Users	User, Admin
+Description	Allows users to view and update basic personal information allowed to be changed (e.g., display name, password).
+Precondition	UC01: User has successfully logged in.
+Postcondition	User's personal information (display name, password) is updated in the system if changed.
+Normal Flow (View Info)	1. User accesses the "Account" or "Personal Profile" section.
+2. System displays the current personal information that the user is allowed to view (e.g., username/email, display name).
+Normal Flow (Update Info)	1. User selects the "Edit" or "Change Password" function.2. User enters the new information (new display name, old password, new password, confirm new password).3. User clicks "Save" or "Update" button.4. System checks validity (e.g., errors: account already exists, old password/new password same, etc.).5. If valid, system updates the information in the user database.6. System notifies successful update.
+Alternative Flow	None.
+Exceptions	- Incorrect old password entered.- New password does not match confirmation password.- New password does not meet validity requirements.- Database connection error during update.
+
+9. Use case: Submit Report/Feedback (UC09)
+
+Field	Description
+Use Case Name	Submit Report/Feedback
+Users	User, Admin
+Description	Provides a form allowing users to submit traffic incident reports (accidents, congestion...) or infrastructure feedback (broken light, bad road...). Can include location.
+Precondition	UC01: User has successfully logged in.
+Postcondition	User's report/feedback is saved to the system and awaits Admin processing (UC14). User receives a successful submission notification.
+Normal Flow	1. User selects the "Submit Report" or "Feedback" function.2. System displays the form.
+3. User enters/selects the report type (incident, infrastructure...).4. User enters a detailed description of the event.
+5. (Optional) User selects the location of the event on the map.6. User clicks the "Submit" button.
+7. System validates input data (e.g., description is not empty).8. System saves the report/feedback to the database.
+9. System displays a successful submission notification to the user.
+Alternative Flow	User can start submitting a report from a specific location on the map (UC02).
+Exceptions	- Invalid input data (missing required information).- Error saving the report to the database.- Network connection lost during submission.
+
+10. Use case: Interact with Support Chatbot (UC10)
+
+Field	Description
+Use Case Name	Interact with Support Chatbot
+Users	User, Admin
+Description	Provides a chat interface allowing users to ask questions/request support about app usage, basic traffic info. Chatbot responds automatically based on knowledge base.
+Precondition	UC01: User has successfully logged in.
+Postcondition	User receives a response from the chatbot for their question/request.
+Normal Flow	1. User opens the chatbot interface (via menu).2. User types a question or request into the chat box.3. User sends the message.4. System sends the question to the chatbot service.5. Chatbot processes the question, queries its knowledge base, and generates a response.6. System displays the chatbot's response in the chat interface.7. User can continue asking other questions (repeat from step 2).
+Alternative Flow	User can select from suggested questions/topics provided by the chatbot.
+Exceptions	- Chatbot does not understand the question or cannot find a suitable answer in the knowledge base.- Error connecting to the chatbot service.- Network connection lost.
+
+11. Use case: Manage Training Data (UC11)
+
+Field	Description
+Use Case Name	Manage Training Data
+Users	Admin
+Description	Allows Admin to upload new datasets (video) to train or improve traffic prediction models. In the context of training data and forecasting, ROI refers to the area of interest for feature extraction and model training, defined per dataset or request, and is similar in structure to the real-time ROI but used for batch processing.
+Precondition	UC01: User has logged in with Admin role.
+Postcondition	New dataset is successfully uploaded and stored in the system, ready for use in the model training process (UC12).
+Normal Flow	1. Admin accesses the "Manage Training Data" function.2. Admin selects the "Upload New Data" option.3. Admin selects file(s) from the local computer.4. Admin provides descriptive information (if needed, e.g., data type, source, time).5. Admin starts the upload process.6. System receives the file(s), performs basic checks (format, size), and stores them in the configured location.7. System notifies the upload result (success or failure).
+Alternative Flow	Admin can view a list of uploaded datasets.
+Exceptions	- File format is not supported.- Error during the upload process (network connection lost, I/O error on server).- Error storing data on the system.
+
+UC11 - MANAGE TRAINING DATA
+───────────────────────────
+DATA ACQUISITION
+• Admin uploads raw traffic videos through drag-and-drop or file selection interface
+• System validates video format, duration, and quality before accepting
+• Admin inputs general metadata (location, date/time)
+• Admin inputs required technical metadata (ROI coordinates by drawing over the 100th frame (just in case the video is black in the first few second), in real life ROI size, desired frame skip (FPS))
+• Upload progress indicator shows status and estimated completion time
+
+VIDEO PROCESSING
+• Backend utilizes the processor.py engine from backendv3/video
+• Processing pipeline extracts:
+  - Vehicle detection, counting, and classification
+  - Traffic density calculations within defined ROIs
+  - Speed estimation across sequential frames
+• Long-running jobs are managed by a task queue with status reporting
+• Admin receives notification upon completion (system alert)
+
+FEATURE EXTRACTION
+• Processed JSON data stored in structured MongoDB collection (TrainingDatasets)
+• Data combination tool merges multiple processed videos with:
+  - Most important, contextual grouping (similar conditions - In this case, we group data by location.)
+  - Temporal alignment (matching time periods)
+• Exports standardized CSV with feature columns for model training
+
+DATA PREPROCESSING
+• Interactive data exploration with statistical summaries and visualizations
+• Automated preprocessing pipeline with configurable options:
+  - Outlier detection and handling (Z-score, IQR methods)
+  - Missing value imputation (interpolation methods)
+  - Feature scaling/normalization
+  - Temporal feature extraction (time of day, day of week, seasonality)
+• Data quality scoring to assess dataset readiness for model training
+
+DATA VERSIONING
+• Dataset versioning system tracks lineage and processing parameters
+• Dataset can be tagged as ready for training models in UC12
+
+12. Use case: Manage Prediction Models (UC12)
+
+Field	Description
+Use Case Name	Manage Prediction Models
+Users	Admin
+Description	Provides an interface for Admin to view list, details, performance, activate retraining, select default, and delete traffic prediction models. In the context of training data and forecasting, ROI refers to the area of interest for feature extraction and model training, defined per dataset or request, and is similar in structure to the real-time ROI but used for batch processing.
+Precondition	UC01: User has logged in with Admin role.
+Postcondition	The status of prediction models (training, active, default, deleted) is updated according to Admin's actions.
+Normal Flow (View)	1. Admin accesses the "Manage Prediction Models" function.2. System displays a list of existing models with basic information (name, version, status, creation/last trained date, performance).3. Admin can select a model to view more detailed information (e.g., accuracy evaluation metrics, data used for training).
+Normal Flow (Retrain)	1. Admin selects a model from the list.2. Admin selects the "Retrain" action.3. (Optional) Admin selects new training data (default can be the latest data from UC11).4. Admin confirms starting the training process.5. System initiates the training process (can run in the background and notify upon completion). Model status updates to "Training".6. Upon completion, model status and performance metrics are updated.
+Normal Flow (Set Default)	1. Admin selects a successfully trained model from the list.2. Admin selects the "Set as Default" action.3. System updates the configuration to use this model for providing forecasts to users (UC06).
+Normal Flow (Delete)	1. Admin selects a model that is no longer used or has low performance.2. Admin selects the "Delete" action.3. System requests confirmation.4. After confirmation, system removes the model from the system.
+Alternative Flow	None.
+Exceptions	- Insufficient new/valid data to retrain.- Error occurs during model training.- Cannot delete a model currently set as default (need to unset default first).- Error updating system status or configuration.
+
+UC12 - MANAGE PREDICTION MODELS
+───────────────────────────
+MODEL INVENTORY
+• Tabular view of all models with key metadata:
+  - Model ID, name, algorithm type (ARIMA, LSTM, BiLSTM)
+  - Performance metrics (RMSE, MAE, R²)
+  - Status (Training, Active, Inactive, Failed)
+
+MODEL OPERATIONS
+• Create new model: Select algorithm type, dataset version, hyperparameters
+• Start/stop training jobs with resource allocation controls
+• Activate/deactivate models for production use
+• Archive or delete outdated models
+• Clone existing models for parameter experimentation
+
+DUAL-MODEL DEPLOYMENT SYSTEM
+• Enhanced two-model approach for comprehensive prediction:
+  - ARIMA model: Captures seasonal trends, daily patterns, and long-term forecasting
+  - LSTM/BiLSTM model: Captures complex spatial-temporal relationships and short-term dynamics
+  - Confidence scoring to indicate reliability of different predictions
+
+PERFORMANCE MONITORING
+• Real-time monitoring dashboard for active models (not actually, still required user request since fill automatic is resource consuming)
+
+13. Use case: Manage Camera Status (UC13)
+
+Field	Description
+Use Case Name	Manage Camera Status
+Users	Admin
+Description	Allows Admin to view camera list, change status (enable/disable display for users, mark maintenance), or remove cameras from the system.
+Precondition	UC01: User has logged in with Admin role.
+Postcondition	Display status, operational status, or existence of cameras in the system is updated according to Admin's actions.
+Normal Flow (View)	1. Admin accesses the "Manage Cameras" function.2. System displays a list of all managed cameras, with information (ID, name/location, current status: Displayed/Hidden/Maintenance, online/offline).
+Normal Flow (Change Status)	1. Admin selects one or more cameras from the list.2. Admin selects a status change action (e.g., "Show to Users", "Hide from Users", "Mark for Maintenance").3. System updates the status for the selected camera(s) in the database.
+Normal Flow (Delete)	1. Admin selects the camera to delete (e.g., faulty device, permanently relocated).2. Admin selects the "Delete" action.3. System requests confirmation.4. After confirmation, system removes the camera from the management system. The camera will no longer be displayed to User or Admin.
+Alternative Flow	Admin might need a function to add new cameras.
+Exceptions	- Error updating camera status in the database.- Error deleting camera.- Selected camera does not exist (possibly deleted by another Admin).
+
+14. Use case: Process Reports/Feedback (UC14)
+
+Field	Description
+Use Case Name	Process Reports/Feedback
+Users	Admin
+Description	Displays list of user reports/feedback (UC09). Admin views details, verifies, marks processing status (Verified, Invalid, Processing, Resolved).
+Precondition	UC01: User has logged in with Admin role. Reports/feedback have been submitted by users via UC09.
+Postcondition	The status of reports/feedback is updated. Notifications may be sent to the submitting user. Reports are stored or deleted according to regulations.
+Normal Flow	1. Admin accesses the "Process Reports/Feedback" function.2. System displays a list of unprocessed reports/feedback or filtered by Admin selection (e.g., all, new, processing...).3. Admin selects a report to view details (content, type, submission time, location).4. Admin verifies the report information (based on other system data like camera feeds, density map, or external info).5. Based on the verification result, Admin selects a status update action, e.g.:- Mark "Verified" (if information is accurate).- Mark "Invalid" or "Rejected" (if information is incorrect, irrelevant).- Mark "Processing" (if further action is needed).- Mark "Resolved" (after the issue is addressed).6. (Optional) Admin composes and sends a reply message to the user who submitted the report.7. System saves the new status and processing history of the report.8. Processed reports may be stored or deleted after a period according to regulations.
+Alternative Flow	Admin can filter, sort, search within the list of reports.
+Exceptions	- Error updating report status in the database.- Error sending reply notification to the user.- Report does not exist (possibly processed/deleted by another Admin).
+
+
+
+
+

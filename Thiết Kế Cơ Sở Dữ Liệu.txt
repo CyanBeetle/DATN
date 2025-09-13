@@ -1,0 +1,162 @@
+THIẾT KẾ CƠ SỞ DỮ LIỆU - HỆ THỐNG GIÁM SÁT GIAO THÔNG ĐÔ THỊ
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Thiết Kế Cơ Sở Dữ Liệu (MongoDB - Dựa trên Pydantic Models)
+
+I. Các Collection Chính và Cấu Trúc Document (Hoàn thiện cho Use Cases):
+
+1.  Collection `users` (Lưu trữ thông tin người dùng)
+    *   Mô tả: Tương ứng với Pydantic model `UserInDB`.
+    *   Các Trường Chính:
+        *   `username`: String (duy nhất, bắt buộc)
+        *   `email`: String (duy nhất, bắt buộc)
+        *   `hashed_password`: String (bắt buộc)
+        *   `role`: Enum ["user", "admin"] (bắt buộc)
+        *   `display_name`: String (tùy chọn)  # Trường chính cho tên hiển thị người dùng.
+        *   `token_version_changed_at`: Datetime (tùy chọn)
+        *   `created_at`, `updated_at`: Datetime
+        # Ghi chú: Model UserInDB cũng bao gồm is_active, last_login, token_version cho hệ thống sử dụng.
+    *   Indexes: `username`, `email`
+
+2.  Collection `cameras` (Lưu trữ thông tin camera)
+    *   Mô tả: Tương ứng với Pydantic model `CameraInDB`.
+    *   Các Trường Chính:
+        *   `name`: String (bắt buộc)
+        *   `location_id`: ObjectId (tùy chọn, tham chiếu đến collection `locations`, bắt buộc để camera có vị trí địa lý)
+        *   `roi_config`: Object (nhúng, bắt buộc; tọa độ và kích thước được định trước tương đối với khung hình camera, chỉ dùng để đếm phương tiện)
+        *   `status`: Enum ["Active", "Inactive", "Maintenance"] (bắt buộc)
+        *   `online`: Boolean (bắt buộc)
+        *   `deleted`: Boolean (mặc định: false)
+        *   `stream_url`: String (bắt buộc)
+        *   `updated_at`: Datetime (Mặc định: thời gian UTC hiện tại)
+        # Ghi chú: congestion_level, last_vehicle_count, last_detection_time KHÔNG được lưu trữ trong collection này.
+        # Chúng được tính toán theo yêu cầu hoặc lấy từ cache tạm thời cho API responses.
+    *   Indexes: `name`, `status`, `online`, `deleted`, `location_id`
+
+3.  Collection `favorite_cameras` (Lưu trữ camera yêu thích của người dùng)
+    *   Mô tả: Tương ứng với Pydantic model `FavoriteCamera`. Đây là collection liên kết/join.
+    *   Các Trường Chính:
+        *   `user_id`: ObjectId (tham chiếu đến `users`)
+        *   `camera_id`: ObjectId (tham chiếu đến `cameras`)
+        *   `notifications_enabled`: Boolean (tùy chọn, mặc định: false)
+        *   `created_at`: Datetime # Trước đây là added_at
+    *   Indexes: `(user_id, camera_id)`
+
+4.  Collection `locations` (Lưu trữ thông tin vị trí địa lý) # COLLECTION MỚI
+    *   Mô tả: Lưu trữ các vị trí địa lý riêng biệt được tham chiếu bởi các collection khác (ví dụ: cameras, reports).
+    *   Các Trường Chính:
+        *   `name`: String (tùy chọn, ví dụ: "Giao lộ Đường Chính")
+        *   `latitude`: Double (bắt buộc)
+        *   `longitude`: Double (bắt buộc)
+        *   `created_at`, `updated_at`: Datetime
+    *   Indexes: `(latitude, longitude)`, `name`
+
+5.  Collection `traffic_data_logs` (Lưu trữ dữ liệu giao thông lịch sử và xử lý hàng loạt)
+    *   Ghi chú: Dữ liệu tắc nghẽn theo thời gian thực, theo yêu cầu (frame, số lượng xe, trạng thái tắc nghẽn) KHÔNG được lưu trữ. 
+    Đối với mỗi camera, chỉ kết quả mới nhất được tính toán/cache và phục vụ theo yêu cầu, và không được lưu trong cơ sở dữ liệu.
+    Collection này được dành cho sử dụng trong tương lai (ví dụ: phân tích hàng loạt, xử lý offline, hoặc nghiên cứu lịch sử).
+    *   Các Trường Chính:
+        *   `camera_id`: ObjectId (tham chiếu đến `cameras`)
+        *   `timestamp`: Datetime
+        *   `vehicle_count`: Integer
+        *   `density`: Double (xe trên 100 mét vuông)
+        *   `congestion_level`: Integer (1-5)
+    *   Indexes: `camera_id`, `timestamp`
+
+6.  Collection `prediction_models` (Lưu trữ thông tin mô hình dự đoán)
+    *   Các Trường Chính:
+        *   `name`: String
+        *   `algorithm`: Enum ["ARIMA", "LSTM", "BiLSTM"]
+        *   `status`: Enum ["training", "active", "inactive", "default", "failed", "deleted"]
+        *   `performance_metrics`: Object (RMSE, MAE, R², v.v.)
+        *   `training_data_id`: ObjectId (tham chiếu đến `training_datasets`)
+        *   `version`: String
+        *   `created_at`, `last_trained_at`: Datetime
+        *   `config`: Object (siêu tham số, v.v.)
+    *   Indexes: `status`, `algorithm`, `version`
+
+7.  Collection `forecasts` (Lưu trữ kết quả dự báo giao thông)
+    *   Các Trường Chính:
+        *   `location_id`: ObjectId (tham chiếu đến `locations`)
+        *   `model_id`: ObjectId (tham chiếu đến `prediction_models`)
+        *   `input_params`: Object (khoảng thời gian, thời tiết, v.v.)
+        *   `forecast_time`: Datetime
+        *   `predicted_density`: Array[Double] (Số lượng xe)
+        *   `predicted_speed`: Array[Double] (km/h)
+        *   `congestion_levels`: Array[Integer] 
+        *   `confidence_intervals`: Array[Double] 
+        *   `created_at`: Datetime
+    *   Indexes: `location_id`, `model_id`, `forecast_time`
+
+8.  Collection `reports` (Lưu trữ báo cáo và phản hồi từ người dùng)
+    *   Các Trường Chính:
+        *   `user_id`: ObjectId (tham chiếu đến `users`) # Trước đây là created_by
+        *   `type`: Enum ["incident", "infrastructure"] # Phù hợp với ReportTypeLiteral của model
+        *   `description`: String
+        *   `status`: Enum ["New", "Processing", "Verified", "Invalid", "Resolved", "Rejected", "Archived"] # Phù hợp với ReportStatusLiteral của model
+        *   `admin_reply`: String (tùy chọn) # Trước đây là resolution_notes
+        *   `location_id`: ObjectId (tùy chọn, tham chiếu đến collection `locations`)
+        *   `image_url`: String (tùy chọn)
+        *   `submitted_at`: Datetime # Trước đây là created_at
+        *   `processed_at`: Datetime (tùy chọn)
+        # Ghi chú: ReportInDB cũng bao gồm title, created_by_username, handled_by_admin_id
+    *   Indexes: `status`, `type`, `user_id`, `submitted_at`, `location_id`
+
+9.  Collection `training_datasets` (Lưu trữ thông tin về tập dữ liệu huấn luyện)
+    *   Các Trường Chính:
+        *   `name`: String
+        *   `location_id`: ObjectId (tham chiếu đến `locations`)
+        *   `date_time`: Datetime
+        *   `roi_config`: Object
+        *   `fps`: Integer
+        *   `version`: String
+        *   `quality_score`: Double
+        *   `status`: Enum ["uploaded", "processing", "ready", "error"]
+        *   `processed_data_url`: String
+        *   `metadata`: Object (thông tin file thô, v.v.)
+        *   `created_at`, `updated_at`: Datetime
+    *   Indexes: `status`, `location_id`, `version`
+
+10. Collection `video_tasks` (Lưu trữ thông tin tác vụ xử lý video)
+    *   Các Trường Chính:
+        *   `task_id`: String (duy nhất)
+        *   `dataset_id`: ObjectId (tham chiếu đến `training_datasets`)
+        *   `status`: Enum ["pending", "processing", "completed", "failed"]
+        *   `progress`: Double (0-100)
+        *   `result_url`: String (tùy chọn)
+        *   `created_at`, `updated_at`: Datetime
+    *   Indexes: `task_id`, `dataset_id`, `status`
+
+11. Collection `report_notifications` (Lưu trữ thông báo cho admin về báo cáo mới)
+    *   Các Trường Chính:
+        *   `report_id`: ObjectId (tham chiếu đến `reports`)
+        *   `admin_id`: ObjectId (tham chiếu đến `users`, cụ thể là người dùng admin)
+        *   `read`: Boolean (mặc định: false)
+        *   `created_at`: Datetime
+        # Ghi chú: ReportNotificationInDB cũng bao gồm report_title, report_type, message để cung cấp ngữ cảnh.
+    *   Indexes: `admin_id`, `read`
+
+II. Quyết Định Nhúng vs. Tham Chiếu - Tóm Tắt:
+
+*   Nhúng được ưu tiên cho:
+    *   Cấu hình ROI trong `cameras` và `training_datasets`.
+*   Tham chiếu được sử dụng cho:
+    *   Mối quan hệ giữa User, camera, location, và model trong các collection.
+    *   `location_id` trong `cameras` và `reports` hiện tham chiếu đến collection `locations` mới.
+
+III. Kiểu Dữ Liệu:
+
+*   Sử dụng các kiểu dữ liệu cơ bản của MongoDB/BSON như String, NumberInt, NumberLong, Double, Boolean, Date, ObjectId, Array, và Object (cho các trường nhúng).
+*   Các trường Enum trong Pydantic models sẽ được lưu trữ dưới dạng String trong MongoDB.
+
+IV. Indexes:
+
+*   Ngoài các index đã được tạo trong `db/session.py` (`users.username`, `users.email`, `video_tasks.task_id`, `cameras.name`, `favorite_cameras.(user_id, camera_id)`, `locations.(latitude, longitude)`), các index khác nên được xem xét và tạo cho các trường được truy vấn thường xuyên để tối ưu hiệu suất, như đã liệt kê ở trên cho từng collection.
+
+V. Phiên Bản, Theo Dõi Trạng Thái, và Metadata:
+
+*   Tất cả các collection hỗ trợ ML/xử lý dữ liệu (training_datasets, prediction_models, forecasts) bao gồm các trường version, status, và metadata để có thể truy vết và tái tạo.
+*   Reports và cameras bao gồm các trường status và deletion để quản lý admin mạnh mẽ.
+*   Tất cả dữ liệu chuỗi thời gian và log (traffic_data_logs, chatbot_logs) được đánh index theo timestamp để truy vấn hiệu quả.
+
+Thiết kế này hiện đã được căn chỉnh hoàn toàn với các use case đã hoàn thiện và yêu cầu hệ thống. Nó hỗ trợ tất cả các hành động của user/admin, quy trình ML/dự báo, và quản lý dữ liệu mạnh mẽ cho Hệ Thống Giám Sát và Dự Đoán Giao Thông Đô Thị.

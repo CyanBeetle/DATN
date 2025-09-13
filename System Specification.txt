@@ -1,0 +1,145 @@
+SYSTEM SPECIFICATION 
+────────────────────────────────────────────────────────────────────
+
+OVERVIEW
+───────────────────────
+The Urban Traffic Monitoring and Forecasting System is designed to provide real-time and predictive insights into urban traffic conditions.
+The system collects traffic data from cameras and user reports, analyzes it, and presents actionable information to users and administrators. Real-time congestion is calculated on-demand. Traffic forecasting utilizes pre-trained deep learning models.
+
+Main Objectives:
+• Provide interfaces for Users and Administrators (Admin) based on roles.
+• Support viewing maps with real-time traffic density overlays (heatmap), and finding routes during travel.
+• Allow live viewing from traffic cameras and management of favorites.
+• Calculate real-time congestion density based on camera ROI analysis (on-demand, not persisted).
+• Provide congestion alerts based on density thresholds.
+• Offer traffic forecasting using pre-trained Keras models, each specific to a defined time horizon (e.g., 15 min, 1h, 2h, 6h).
+• Manage foundational data: cameras (status, ROI), user reports/feedback, and metadata for deployed forecast models.
+• Enable future expansion for batch analytics and historical studies.
+
+Project Structure:
+• Frontend (frontendv3): React/Next.js interface, Ant Design, Axios for API calls.
+• Backend (backendv3): Python/FastAPI REST service, MongoDB. Machine learning for forecasting is handled by loading pre-trained Keras models and scalers. YOLO is used for real-time vehicle detection.
+
+ARCHITECTURE & GENERAL PROCESSING FLOW
+─────────────────────────────────
+• Frontend calls backend API endpoints for all data and actions.
+• Backend authenticates using JWT (`auth/security.py`). Role checks enforce permissions.
+• Data (Users, Cameras, Reports, Forecast Model Metadata, etc.) stored in MongoDB. Real-time congestion data is NOT persisted.
+• Real-time Congestion Calculation:
+    – `cameras/congestion.py`: Uses `VehicleDetector` (YOLOv8 from `video/detector.py`) to count vehicles in a camera's defined ROI (Region of Interest: predetermined coordinates and size relative to the camera frame, used for vehicle counting only).
+    – Calculates vehicle density (vehicles per 100m²) based on ROI dimensions.
+    – Maps density to congestion level (1-5) using standardized thresholds.
+    – For map overlays and route warnings (UC02, UC03, UC05), the frontend uses a dynamic effect radius around each camera marker (not the ROI) to visualize and check congestion impact. The radius increases with congestion severity.
+    – This process is stateless and on-demand: only the latest result per camera is calculated and served; no historical records are saved.
+    – Each camera's ROI is included in API responses for vehicle counting, while the effect radius for map overlays is computed on the frontend.
+• Traffic Forecasting (Separate Process):
+    – Utilizes pre-trained Keras models (.h5 or .keras files) and corresponding scaler (.pkl files).
+    – Different models are used for different prediction time horizons (e.g., 15 min, 1 hour, 2 hours, 6 hours).
+    – The backend loads the appropriate model based on the user's request.
+    – Model training and updates occur offline, outside the direct operation of this application. New model files are deployed to be accessible by the backend.
+
+DATABASE DESIGN (SUMMARY)
+───────────────────────────
+Refer to `Database Design.txt` for detailed schema. Key collections include Users, Cameras, FavoriteCameras, Reports, and `prediction_models` (now storing metadata for pre-trained models like file paths, versions, and target time horizons). The `training_datasets` collection is deprecated in its original form; input data for predictions will be sourced from recent operational data or other curated sources as defined by the model requirements, not managed as distinct "training datasets" via the admin interface for model building. Real-time congestion data is not persisted.
+
+USE CASE IMPLEMENTATION DETAILS (SUMMARY)
+──────────────────────────────
+Detailed flow and exceptions for each UC are in `Use Case Description.txt`.
+Note: Congestion levels (1-5) used in UC02, UC03, UC05, UC13 are derived from real-time density calculations in `cameras/congestion.py`.
+
+──────────────────────────── UC01 – SYSTEM LOGIN ────────────────────────────
+• Frontend: Login form submits to `/api/auth/login` (or `/api/users/login`). On success, stores JWT and redirects user based on role. No self-registration; new users/admin created via `/api/auth/register` (For now).
+• Backend: Authenticates credentials, issues JWT, and enforces role-based access.
+
+──────────────────────────── UC02 – VIEW TRAFFIC MAP ────────────────────────────
+• Frontend: Uses Leaflet to render an interactive map. Fetches camera list and latest congestion states from `/api/cameras`. Overlays a heatmap based on camera congestion levels. The visualization of congestion (e.g., heatmap intensity and spread) is influenced by a dynamic effect radius around each camera marker, which increases with congestion severity. This effect radius is distinct from the camera's ROI.
+• Backend: Provides camera metadata (including lat/lng and name) and real-time congestion level (on-demand, not persisted) via `/api/cameras`.
+
+──────────────────────────── UC03 – FIND ROUTE ────────────────────────────
+• Frontend: User selects start/end points (by geocoded search or clicking on map to add markers). Uses Leaflet's client-side routing (e.g., via `leaflet-routing-machine`) to calculate and display the route. Checks if the route intersects the dynamic effect radius of any camera with congestion level 3 or higher. If so, displays a warning notification to the user. The effect radius is determined by the frontend based on congestion severity.
+• Backend: Not directly involved in route calculation if using client-side Leaflet routing. Supplies camera congestion data via `/api/cameras` which the frontend uses for the warning logic.
+
+──────────────────────────── UC04 – VIEW REAL-TIME CAMERA ────────────────────────────
+• Frontend: Lists cameras from `/api/cameras`. Displays video stream using camera's `stream_url`.
+• Backend: Returns camera metadata and stream URLs.
+
+──────────────────────────── UC05 – MANAGE FAVORITE CAMERAS ────────────────────────────
+• Frontend: Allows user to add/remove favorites via `/api/user/favorites`. Displays favorite cameras and their congestion state. Shows alerts if congestion exceeds threshold.
+• Backend: Manages `favorite_cameras` collection. Checks congestion for favorited cameras and triggers notifications.
+
+──────────────────────────── UC06 – VIEW TRAFFIC FORECAST ────────────────────────────
+• Frontend: User opens forecast interface. Selects prediction horizon (e.g., 15 min, 1h, 2h, 6h). Calls `/api/forecasts/` with the selected horizon (location may be fixed or selectable). Displays returned forecast as a chart.
+• Backend: Receives request, validates parameters. Loads the appropriate pre-trained Keras model and scaler file corresponding to the requested time horizon. Prepares necessary input data (e.g., recent aggregated traffic data). Runs prediction and returns results.
+
+#This UC will use pre-trained models. Complexity shifts from in-app training to model deployment.
+
+──────────────────────────── UC07 – VIEW NEWS & WEATHER ────────────────────────────
+• Frontend: Integrates with external APIs for news and weather. Displays latest news and weather for user's area.
+• Backend: Not involved (standalone frontend feature).
+
+──────────────────────────── UC08 – MANAGE PERSONAL ACCOUNT ────────────────────────────
+• Frontend: Allows user to view/update display name and password via `/api/user/account` endpoints.
+• Backend: Updates user info in `users` collection.
+
+──────────────────────────── UC09 – SUBMIT REPORT/FEEDBACK ────────────────────────────
+• Frontend: Displays form for report/feedback with optional location and image. Submits to `/api/reports`.
+• Backend: Saves report to `reports` collection with status "Submitted".
+
+──────────────────────────── UC10 – INTERACT WITH SUPPORT CHATBOT ────────────────────────────
+• Frontend: Integrates chatbot widget/service.
+• Backend: Not involved (standalone frontend feature).
+
+──────────────────────────── UC11 – ACCESS ADMIN DASHBOARD ────────────────────────────
+• Frontend: Admin navigates to a dedicated dashboard section. This dashboard provides UI for system overview, camera management (formerly UC13), report processing (formerly UC14), user list viewing, and an overview of deployed forecast models.
+    - (Future Work) Include a link/section to navigate to a dedicated Model Performance Metrics page.
+• Backend: Provides aggregated data for the dashboard. Listing users, and listing metadata of deployed forecast models. The previous functionality for managing training datasets is removed.
+
+#The Admin Dashboard consolidates administrative functions into a single interface.
+
+──────────────────────────── UC12 – MANAGE PREDICTION MODELS ────────────────────────────
+• (Repurposed - Future Work) This Use Case is repurposed for "Manage and Monitor Deployed Forecast Model Versions."
+• Frontend (Future Work): A dedicated interface for:
+    - Viewing all uploaded model versions per time horizon.
+    - Setting an active model version for each time horizon.
+    - Viewing/editing detailed metadata for model files.
+    - Displaying basic operational statistics for active models.
+    - (Optional) Archiving/deleting old model versions.
+    - Displaying detailed performance metrics (MAE, RMSE, R2, step-wise) for each model version, potentially by integrating or linking to a metrics viewer page that loads data from a `trained_models.pkl` file.
+• Backend (Future Work): APIs to support:
+    - Listing all model versions with detailed metadata.
+    - Setting the active model version for a time horizon.
+    - Updating model metadata.
+    - (Potentially) Storing and retrieving basic operational statistics.
+    - Serving the data from `trained_models.pkl` for the metrics display.
+
+#This UC will provide granular control and monitoring for deployed forecast models.
+
+──────────────────────────── UC13 – MANAGE CAMERA STATUS & ROI ────────────────────────────
+• Frontend: Admin views camera list (`GET /api/admin/cameras`). Changes camera status or deletes camera via provided controls. Opens ROI editor: captures frame, draws/edit polygon, enters real-world dimensions. Saves ROI config to backend.
+• Backend: Updates camera status or deletion in `cameras` collection. Receives and stores ROI coordinates and dimensions (normalized) for vehicle counting. Ensures ROI is included in camera metadata for downstream processing.
+
+──────────────────────────── UC14 – PROCESS REPORTS/FEEDBACK (ADMIN) ────────────────────────────
+• Frontend: Lists reports, allows filtering, status updates, and admin replies. Uses `/api/admin/reports` and `/api/admin/notifications`.
+• Backend: Updates report status, stores admin replies, manages notifications.
+
+BASIC GUIDE FOR MAINTENANCE PROGRAMMERS
+──────────────────────────────────────────────
+• Setup: Install `requirements.txt`, configure `.env`.
+• Key Backend Modules:
+    – `auth/`: Authentication & Authorization.
+    – `db/`: Database models & session.
+    – `cameras/`: Camera management (UC13), user viewing (UC04), real-time congestion calculation (UC2,3,5), favorite management (UC5). Includes `congestion.py`.
+    – `video/`: Contains `detector.py` (YOLOv8).
+    – `ml/`: Forecasting model services (UC6, 11, 12).
+    – `forecasts/`: API router for UC06.
+    – `reports/`: Report submission (UC09) & processing (UC14) logic.
+• Frontend Structure:
+    – `src/app/user/`: User-facing features.
+    – `src/app/admin/`: Admin-facing features.
+    – `src/components/`: Reusable UI parts.
+    – `src/context/`: Authentication context (`authContext.js`).
+    – `src/utils/`: Axios instance (`axiosInstance.js`).
+
+CONCLUSION
+────────────
+This specification outlines the system architecture and Use Case implementation approach. Core components for camera viewing, management, and real-time congestion calculation are established. Forecasting features (UC06) will leverage pre-trained models. The Admin role will primarily interact via the new Admin Dashboard (UC11), which consolidates several previous admin functions. Future work includes enhancing the metrics viewing and model management capabilities.

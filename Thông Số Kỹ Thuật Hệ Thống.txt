@@ -1,0 +1,145 @@
+THÔNG SỐ KỸ THUẬT HỆ THỐNG - HỆ THỐNG GIÁM SÁT GIAO THÔNG ĐÔ THỊ
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+TỔNG QUAN
+───────────────────────
+Hệ Thống Giám Sát và Dự Báo Giao Thông Đô Thị được thiết kế để cung cấp thông tin chi tiết về tình trạng giao thông theo thời gian thực và dự đoán.
+Hệ thống thu thập dữ liệu giao thông từ camera và báo cáo của người dùng, phân tích và trình bày thông tin có thể hành động cho người dùng và quản trị viên. Tắc nghẽn theo thời gian thực được tính toán theo yêu cầu. Dự báo giao thông sử dụng các mô hình deep learning đã được huấn luyện trước.
+
+Mục Tiêu Chính:
+• Cung cấp giao diện cho Người dùng và Quản trị viên (Admin) dựa trên vai trò.
+• Hỗ trợ xem bản đồ với lớp phủ mật độ giao thông theo thời gian thực (heatmap), và tìm đường trong quá trình di chuyển.
+• Cho phép xem trực tiếp từ camera giao thông và quản lý yêu thích.
+• Tính toán mật độ tắc nghẽn theo thời gian thực dựa trên phân tích ROI camera (theo yêu cầu, không lưu trữ).
+• Cung cấp cảnh báo tắc nghẽn dựa trên ngưỡng mật độ.
+• Cung cấp dự báo giao thông sử dụng các mô hình Keras đã huấn luyện trước, mỗi mô hình dành riêng cho một khoảng thời gian xác định (ví dụ: 15 phút, 1h, 2h, 6h).
+• Quản lý dữ liệu nền tảng: camera (trạng thái, ROI), báo cáo/phản hồi người dùng, và metadata cho các mô hình dự báo đã triển khai.
+• Cho phép mở rộng trong tương lai cho phân tích hàng loạt và nghiên cứu lịch sử.
+
+Cấu Trúc Dự Án:
+• Frontend (frontendv3): Giao diện React/Next.js, Ant Design, Axios cho API calls.
+• Backend (backendv3): Dịch vụ REST Python/FastAPI, MongoDB. Machine learning cho dự báo được xử lý bằng cách tải các mô hình Keras và scaler đã huấn luyện trước. YOLO được sử dụng cho phát hiện phương tiện theo thời gian thực.
+
+KIẾN TRÚC & LUỒNG XỬ LÝ CHUNG
+─────────────────────────────────
+• Frontend gọi các endpoint API backend cho tất cả dữ liệu và hành động.
+• Backend xác thực sử dụng JWT (`auth/security.py`). Kiểm tra vai trò thực thi quyền hạn.
+• Dữ liệu (Users, Cameras, Reports, Forecast Model Metadata, v.v.) được lưu trữ trong MongoDB. Dữ liệu tắc nghẽn theo thời gian thực KHÔNG được lưu trữ.
+• Tính Toán Tắc Nghẽn Theo Thời Gian Thực:
+    – `cameras/congestion.py`: Sử dụng `VehicleDetector` (YOLOv8 từ `video/detector.py`) để đếm phương tiện trong ROI đã định nghĩa của camera (Region of Interest: tọa độ và kích thước được định trước tương đối với khung hình camera, chỉ dùng để đếm phương tiện).
+    – Tính toán mật độ phương tiện (xe trên 100m²) dựa trên kích thước ROI.
+    – Ánh xạ mật độ thành mức độ tắc nghẽn (1-5) sử dụng ngưỡng chuẩn hóa.
+    – Cho lớp phủ bản đồ và cảnh báo đường đi (UC02, UC03, UC05), frontend sử dụng bán kính hiệu ứng động xung quanh mỗi marker camera (không phải ROI) để hiển thị và kiểm tra tác động tắc nghẽn. Bán kính tăng theo mức độ nghiêm trọng của tắc nghẽn.
+    – Quá trình này là stateless và theo yêu cầu: chỉ kết quả mới nhất cho mỗi camera được tính toán và phục vụ; không có bản ghi lịch sử nào được lưu.
+    – ROI của mỗi camera được bao gồm trong API responses để đếm phương tiện, trong khi bán kính hiệu ứng cho lớp phủ bản đồ được tính toán trên frontend.
+• Dự Báo Giao Thông (Quy Trình Riêng Biệt):
+    – Sử dụng các mô hình Keras đã huấn luyện trước (file .h5 hoặc .keras) và scaler tương ứng (file .pkl).
+    – Các mô hình khác nhau được sử dụng cho các khoảng thời gian dự đoán khác nhau (ví dụ: 15 phút, 1 giờ, 2 giờ, 6 giờ).
+    – Backend tải mô hình phù hợp dựa trên yêu cầu của người dùng.
+    – Huấn luyện và cập nhật mô hình diễn ra offline, bên ngoài hoạt động trực tiếp của ứng dụng này. Các file mô hình mới được triển khai để backend có thể truy cập.
+
+THIẾT KẾ CƠ SỞ DỮ LIỆU (TÓM TẮT)
+───────────────────────────
+Tham khảo `Thiết Kế Cơ Sở Dữ Liệu.txt` cho schema chi tiết. Các collection chính bao gồm Users, Cameras, FavoriteCameras, Reports, và `prediction_models` (hiện lưu trữ metadata cho các mô hình đã huấn luyện trước như đường dẫn file, phiên bản, và khoảng thời gian mục tiêu). Collection `training_datasets` đã bị deprecated trong dạng ban đầu; dữ liệu đầu vào cho dự đoán sẽ được lấy từ dữ liệu hoạt động gần đây hoặc các nguồn được tuyển chọn khác như định nghĩa bởi yêu cầu mô hình, không được quản lý như "training datasets" riêng biệt qua giao diện admin để xây dựng mô hình. Dữ liệu tắc nghẽn theo thời gian thực không được lưu trữ.
+
+CHI TIẾT TRIỂN KHAI USE CASE (TÓM TẮT)
+──────────────────────────────
+Luồng chi tiết và ngoại lệ cho từng UC có trong `Mô Tả Use Case.txt`.
+Ghi chú: Các mức độ tắc nghẽn (1-5) được sử dụng trong UC02, UC03, UC05, UC13 được tính từ việc tính toán mật độ theo thời gian thực trong `cameras/congestion.py`.
+
+──────────────────────────── UC01 – ĐĂNG NHẬP HỆ THỐNG ────────────────────────────
+• Frontend: Form đăng nhập gửi đến `/api/auth/login` (hoặc `/api/users/login`). Khi thành công, lưu JWT và chuyển hướng người dùng dựa trên vai trò. Không có tự đăng ký; người dùng/admin mới được tạo qua `/api/auth/register` (Hiện tại).
+• Backend: Xác thực thông tin đăng nhập, cấp JWT, và thực thi truy cập dựa trên vai trò.
+
+──────────────────────────── UC02 – XEM BẢN ĐỒ GIAO THÔNG ────────────────────────────
+• Frontend: Sử dụng Leaflet để render bản đồ tương tác. Lấy danh sách camera và trạng thái tắc nghẽn mới nhất từ `/api/cameras`. Hiển thị heatmap dựa trên mức độ tắc nghẽn camera. Việc hiển thị tắc nghẽn (ví dụ: cường độ và phạm vi heatmap) bị ảnh hưởng bởi bán kính hiệu ứng động xung quanh mỗi marker camera, tăng theo mức độ nghiêm trọng tắc nghẽn. Bán kính hiệu ứng này khác biệt với ROI của camera.
+• Backend: Cung cấp metadata camera (bao gồm lat/lng và tên) và mức độ tắc nghẽn theo thời gian thực (theo yêu cầu, không lưu trữ) qua `/api/cameras`.
+
+──────────────────────────── UC03 – TÌM ĐƯỜNG ────────────────────────────
+• Frontend: Người dùng chọn điểm bắt đầu/kết thúc (bằng tìm kiếm geocoded hoặc click trên bản đồ để thêm marker). Sử dụng routing phía client Leaflet (ví dụ: qua `leaflet-routing-machine`) để tính toán và hiển thị tuyến đường. Kiểm tra nếu tuyến đường giao với bán kính hiệu ứng động của bất kỳ camera nào có mức độ tắc nghẽn 3 trở lên. Nếu có, hiển thị thông báo cảnh báo cho người dùng. Bán kính hiệu ứng được xác định bởi frontend dựa trên mức độ nghiêm trọng tắc nghẽn.
+• Backend: Không trực tiếp tham gia vào tính toán tuyến đường nếu sử dụng Leaflet routing phía client. Cung cấp dữ liệu tắc nghẽn camera qua `/api/cameras` mà frontend sử dụng cho logic cảnh báo.
+
+──────────────────────────── UC04 – XEM CAMERA THỜI GIAN THỰC ────────────────────────────
+• Frontend: Liệt kê camera từ `/api/cameras`. Hiển thị luồng video sử dụng `stream_url` của camera.
+• Backend: Trả về metadata camera và URL luồng.
+
+──────────────────────────── UC05 – QUẢN LÝ CAMERA YÊU THÍCH ────────────────────────────
+• Frontend: Cho phép người dùng thêm/xóa yêu thích qua `/api/user/favorites`. Hiển thị camera yêu thích và trạng thái tắc nghẽn của chúng. Hiển thị cảnh báo nếu tắc nghẽn vượt ngưỡng.
+• Backend: Quản lý collection `favorite_cameras`. Kiểm tra tắc nghẽn cho camera được yêu thích và kích hoạt thông báo.
+
+──────────────────────────── UC06 – XEM DỰ BÁO GIAO THÔNG ────────────────────────────
+• Frontend: Người dùng mở giao diện dự báo. Chọn khoảng thời gian dự đoán (ví dụ: 15 phút, 1h, 2h, 6h). Gọi `/api/forecasts/` với khoảng thời gian đã chọn (vị trí có thể cố định hoặc có thể chọn). Hiển thị dự báo trả về dưới dạng biểu đồ.
+• Backend: Nhận yêu cầu, xác thực tham số. Tải mô hình Keras đã huấn luyện trước và file scaler tương ứng với khoảng thời gian được yêu cầu. Chuẩn bị dữ liệu đầu vào cần thiết (ví dụ: dữ liệu giao thông tổng hợp gần đây). Chạy dự đoán và trả về kết quả.
+
+#UC này sẽ sử dụng các mô hình đã huấn luyện trước. Độ phức tạp chuyển từ huấn luyện trong ứng dụng sang triển khai mô hình.
+
+──────────────────────────── UC07 – XEM TIN TỨC & THỜI TIẾT ────────────────────────────
+• Frontend: Tích hợp với API bên ngoài cho tin tức và thời tiết. Hiển thị tin tức và thời tiết mới nhất cho khu vực của người dùng.
+• Backend: Không tham gia (tính năng frontend độc lập).
+
+──────────────────────────── UC08 – QUẢN LÝ TÀI KHOẢN CÁ NHÂN ────────────────────────────
+• Frontend: Cho phép người dùng xem/cập nhật tên hiển thị và mật khẩu qua các endpoint `/api/user/account`.
+• Backend: Cập nhật thông tin người dùng trong collection `users`.
+
+──────────────────────────── UC09 – GỬI BÁO CÁO/PHẢN HỒI ────────────────────────────
+• Frontend: Hiển thị form cho báo cáo/phản hồi với vị trí và hình ảnh tùy chọn. Gửi đến `/api/reports`.
+• Backend: Lưu báo cáo vào collection `reports` với trạng thái "Submitted".
+
+──────────────────────────── UC10 – TƯƠNG TÁC VỚI CHATBOT HỖ TRỢ ────────────────────────────
+• Frontend: Tích hợp widget/dịch vụ chatbot.
+• Backend: Không tham gia (tính năng frontend độc lập).
+
+──────────────────────────── UC11 – TRUY CẬP DASHBOARD ADMIN ────────────────────────────
+• Frontend: Admin điều hướng đến phần dashboard chuyên dụng. Dashboard này cung cấp UI cho tổng quan hệ thống, quản lý camera (trước đây UC13), xử lý báo cáo (trước đây UC14), xem danh sách người dùng, và tổng quan về các mô hình dự báo đã triển khai.
+    - (Công việc tương lai) Bao gồm liên kết/phần để điều hướng đến trang Model Performance Metrics chuyên dụng.
+• Backend: Cung cấp dữ liệu tổng hợp cho dashboard. Liệt kê người dùng và liệt kê metadata của các mô hình dự báo đã triển khai. Chức năng trước đây để quản lý training datasets đã được loại bỏ.
+
+#Admin Dashboard tổng hợp các chức năng quản trị vào một giao diện duy nhất.
+
+──────────────────────────── UC12 – QUẢN LÝ MÔ HÌNH DỰ ĐOÁN ────────────────────────────
+• (Được định hướng lại - Công việc tương lai) Use Case này được định hướng lại cho "Quản lý và Giám sát Phiên bản Mô hình Dự báo Đã triển khai."
+• Frontend (Công việc tương lai): Giao diện chuyên dụng cho:
+    - Xem tất cả phiên bản mô hình đã upload cho mỗi khoảng thời gian.
+    - Đặt phiên bản mô hình hoạt động cho mỗi khoảng thời gian.
+    - Xem/chỉnh sửa metadata chi tiết cho các file mô hình.
+    - Hiển thị thống kê hoạt động cơ bản cho các mô hình hoạt động.
+    - (Tùy chọn) Lưu trữ/xóa các phiên bản mô hình cũ.
+    - Hiển thị các số liệu hiệu suất chi tiết (MAE, RMSE, R2, theo bước) cho mỗi phiên bản mô hình, có thể bằng cách tích hợp hoặc liên kết đến trang xem số liệu tải dữ liệu từ file `trained_models.pkl`.
+• Backend (Công việc tương lai): API để hỗ trợ:
+    - Liệt kê tất cả phiên bản mô hình với metadata chi tiết.
+    - Đặt phiên bản mô hình hoạt động cho khoảng thời gian.
+    - Cập nhật metadata mô hình.
+    - (Có thể) Lưu trữ và truy xuất thống kê hoạt động cơ bản.
+    - Phục vụ dữ liệu từ `trained_models.pkl` cho việc hiển thị số liệu.
+
+#UC này sẽ cung cấp kiểm soát chi tiết và giám sát cho các mô hình dự báo đã triển khai.
+
+──────────────────────────── UC13 – QUẢN LÝ TRẠNG THÁI CAMERA & ROI ────────────────────────────
+• Frontend: Admin xem danh sách camera (`GET /api/admin/cameras`). Thay đổi trạng thái camera hoặc xóa camera qua các điều khiển được cung cấp. Mở trình chỉnh sửa ROI: chụp frame, vẽ/chỉnh sửa polygon, nhập kích thước thế giới thực. Lưu cấu hình ROI vào backend.
+• Backend: Cập nhật trạng thái camera hoặc xóa trong collection `cameras`. Nhận và lưu trữ tọa độ và kích thước ROI (chuẩn hóa) để đếm phương tiện. Đảm bảo ROI được bao gồm trong metadata camera cho xử lý downstream.
+
+──────────────────────────── UC14 – XỬ LÝ BÁO CÁO/PHẢN HỒI (ADMIN) ────────────────────────────
+• Frontend: Liệt kê báo cáo, cho phép lọc, cập nhật trạng thái, và trả lời admin. Sử dụng `/api/admin/reports` và `/api/admin/notifications`.
+• Backend: Cập nhật trạng thái báo cáo, lưu trữ trả lời admin, quản lý thông báo.
+
+HƯỚNG DẪN CƠ BẢN CHO LẬP TRÌNH VIÊN BẢO TRÌ
+──────────────────────────────────────────────
+• Thiết lập: Cài đặt `requirements.txt`, cấu hình `.env`.
+• Các Module Backend Chính:
+    – `auth/`: Xác thực & Ủy quyền.
+    – `db/`: Mô hình cơ sở dữ liệu & session.
+    – `cameras/`: Quản lý camera (UC13), xem người dùng (UC04), tính toán tắc nghẽn theo thời gian thực (UC2,3,5), quản lý yêu thích (UC5). Bao gồm `congestion.py`.
+    – `video/`: Chứa `detector.py` (YOLOv8).
+    – `ml/`: Dịch vụ mô hình dự báo (UC6, 11, 12).
+    – `forecasts/`: API router cho UC06.
+    – `reports/`: Logic gửi báo cáo (UC09) & xử lý (UC14).
+• Cấu Trúc Frontend:
+    – `src/app/user/`: Tính năng hướng đến người dùng.
+    – `src/app/admin/`: Tính năng hướng đến admin.
+    – `src/components/`: Các phần UI có thể tái sử dụng.
+    – `src/context/`: Context xác thực (`authContext.js`).
+    – `src/utils/`: Instance Axios (`axiosInstance.js`).
+
+KẾT LUẬN
+────────────
+Thông số kỹ thuật này phác thảo kiến trúc hệ thống và phương pháp triển khai Use Case. Các thành phần cốt lõi cho việc xem, quản lý camera và tính toán tắc nghẽn theo thời gian thực đã được thiết lập. Các tính năng dự báo (UC06) sẽ tận dụng các mô hình đã huấn luyện trước. Vai trò Admin sẽ chủ yếu tương tác qua Admin Dashboard mới (UC11), tổng hợp một số chức năng admin trước đây. Công việc tương lai bao gồm nâng cao khả năng xem số liệu và quản lý mô hình.

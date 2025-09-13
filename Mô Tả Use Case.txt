@@ -1,0 +1,200 @@
+MÔ TẢ USE CASE - HỆ THỐNG GIÁM SÁT GIAO THÔNG ĐÔ THỊ
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+Đây là danh sách 14 chức năng chính.
+Yêu Cầu Chức Năng:
+
+User: Người dùng cuối sử dụng các chức năng cơ bản để giám sát, nhận thông tin, tìm đường, tương tác và nhận hỗ trợ liên quan đến giao thông.
+Admin: Quản trị viên hệ thống có tất cả quyền của User cộng với quyền bổ sung để quản lý dữ liệu nền tảng, mô hình dự đoán, thiết bị camera và xử lý phản hồi người dùng.
+
+Xác Thực và Ủy Quyền
+
+UC01: Đăng Nhập Hệ Thống
+Mô tả: Tất cả người dùng (User và Admin) phải đăng nhập để truy cập các chức năng hệ thống. Hệ thống xác thực thông tin đăng nhập (username/email và password) so với cơ sở dữ liệu người dùng. Khi xác thực thành công, hệ thống sẽ hiển thị giao diện và chức năng phù hợp tương ứng với vai trò của người dùng (User hoặc Admin).
+Ghi chú: Mặc dù hệ thống không cung cấp giao diện tự đăng ký cho người dùng, tài khoản người dùng được tạo và quản lý qua các endpoint API backend chuyên dụng (ví dụ: `/api/auth/register`). Điều này cho phép tạo tài khoản quản trị hoặc tích hợp với các quy trình cung cấp khác.
+
+Chức Năng Chung (Cho cả User và Admin)
+
+UC02: Xem Bản Đồ Giao Thông
+Mô tả: Hiển thị bản đồ số tương tác sử dụng Leaflet với lớp phủ mật độ giao thông theo thời gian thực (heatmap).
+Cho phép zoom, pan, di chuyển bản đồ. Cho lớp phủ tắc nghẽn (heatmap) và cảnh báo tuyến đường (UC03), frontend sử dụng bán kính hiệu ứng động xung quanh mỗi marker camera. Bán kính hiệu ứng này khác biệt với ROI của camera (được backend sử dụng chỉ để đếm phương tiện) và kích thước của nó tăng theo mức độ nghiêm trọng tắc nghẽn.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+UC03: Tìm Đường
+Mô tả: Cho phép người dùng nhập điểm bắt đầu và đích đến để tìm tuyến đường di chuyển tối ưu. Người dùng có thể nhập điểm bằng cách gõ địa chỉ (với geocoding) hoặc bằng cách click trên bản đồ để đặt marker. Hệ thống sử dụng khả năng routing phía client mặc định của Leaflet để gợi ý tuyến đường. Nó cảnh báo người dùng nếu tuyến đường được gợi ý đi qua bán kính hiệu ứng động của vị trí camera đang gặp mức độ tắc nghẽn 3 trở lên. Bán kính hiệu ứng được xác định bởi frontend dựa trên mức độ nghiêm trọng tắc nghẽn.
+Điều kiện tiên quyết: UC02 (Xem Bản Đồ Giao Thông). Người dùng phải ở trên giao diện bản đồ để kích hoạt chức năng tìm đường.
+
+UC04: Xem Camera Thời Gian Thực
+Mô tả: Cho phép người dùng chọn và xem hình ảnh trực tiếp (luồng video với fps rất thấp (1 frame mỗi 8 giây)) từ các camera giao thông được cài đặt và tích hợp vào hệ thống. ROI (tọa độ và kích thước được định trước) chỉ được sử dụng để đếm phương tiện, không cho lớp phủ bản đồ.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+UC05: Quản Lý Camera Yêu Thích
+Mô tả: Cho phép người dùng đánh dấu một hoặc nhiều camera là "yêu thích". Hệ thống lưu danh sách này cho mỗi người dùng. Hệ thống sẽ tự động gửi thông báo cho người dùng khi mật độ giao thông tại vị trí của camera yêu thích vượt quá ngưỡng tắc nghẽn được định trước. ROI được sử dụng để đếm phương tiện; bán kính hiệu ứng được sử dụng cho cảnh báo dựa trên bản đồ.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống). Người dùng phải có thể chọn camera (ví dụ: từ danh sách, bản đồ, hoặc view stream) để đánh dấu là yêu thích.
+
+UC06: Xem Dự Báo Giao Thông
+Mô tả: Hiển thị thông tin dự báo tình trạng giao thông cho các khu vực cụ thể (ban đầu là vị trí cố định, có thể mở rộng).
+Người dùng có thể chọn khoảng thời gian dự báo (ví dụ: 15 phút, 1 giờ, 2 giờ, 6 giờ).
+Hệ thống sử dụng mô hình machine learning Keras đã huấn luyện trước và file scaler liên quan (.pkl), dành riêng cho khoảng thời gian đã chọn, để tạo dự báo.
+Dữ liệu đầu vào cho mô hình được chuẩn bị bởi backend. Dự báo, bao gồm mức độ tắc nghẽn dự đoán hoặc tốc độ giao thông, được trình bày cho người dùng, thường dưới dạng biểu đồ chuỗi thời gian.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+UC07: Xem Tin Tức & Thời Tiết
+Mô tả: Cung cấp khu vực hiển thị tin tức giao thông đô thị mới nhất, thông báo từ cơ quan chức năng, và thông tin dự báo thời tiết cho các khu vực quan tâm của người dùng hoặc vị trí hiện tại của họ.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+UC08: Quản Lý Tài Khoản Cá Nhân
+Mô tả: Cho phép người dùng xem và cập nhật thông tin cá nhân cơ bản được phép thay đổi, ví dụ: tên hiển thị, mật khẩu đăng nhập.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+UC09: Gửi Báo Cáo/Phản Hồi
+Mô tả: Cung cấp form cho phép người dùng nhập thông tin và gửi báo cáo về các sự cố giao thông đang diễn ra (tai nạn, tắc nghẽn bất thường, chướng ngại vật...) hoặc phản hồi về các vấn đề cơ sở hạ tầng (đèn giao thông hỏng, đường xuống cấp...). Có thể bao gồm vị trí trên bản đồ và hình ảnh (nếu được hỗ trợ).
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+UC10: Tương Tác Với Chatbot Hỗ Trợ
+Mô tả: Cung cấp giao diện chat cho phép người dùng (User và Admin) đặt câu hỏi hoặc yêu cầu hỗ trợ về việc sử dụng ứng dụng, thông tin giao thông cơ bản, hoặc các vấn đề thường gặp. Chatbot sẽ cố gắng trả lời tự động dựa trên cơ sở kiến thức đã được huấn luyện.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống).
+
+Chức Năng Dành Riêng Cho Admin (Cho Vai Trò Admin)
+(Admin kế thừa tất cả Use Cases từ UC02 đến UC10)
+
+UC11: Truy Cập Dashboard Admin
+Mô tả: Cho phép Admin truy cập dashboard tập trung để giám sát hệ thống và quản lý hoạt động. Dashboard này thay thế chức năng "Quản lý Dữ liệu Huấn luyện" trước đây.
+Admin Dashboard cung cấp quyền truy cập vào:
+    *   (Công việc tương lai) Liên kết đến Trang Model Performance Metrics: Liên kết hoặc phần để điều hướng đến trang chuyên dụng hiển thị số liệu hiệu suất chi tiết của các mô hình dự báo đã triển khai (như được nêu trong đề xuất cho trang xem số liệu).
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống với vai trò Admin).
+
+UC12: Quản Lý và Giám Sát Phiên Bản Mô Hình Dự Báo Đã Triển Khai (Được Định Hướng Lại)
+Mô tả: (Công việc tương lai) Cho phép Admin thực hiện quản lý vòng đời chi tiết và giám sát hoạt động của các mô hình dự báo đã huấn luyện trước đã triển khai. Điều này bổ sung cho tổng quan có thể tồn tại trong UC11 (Admin Dashboard) và cung cấp giao diện chuyên dụng cho kiểm soát phiên bản mô hình và giám sát cơ bản.
+Chức Năng Chính (Đề xuất cho Công việc tương lai):
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống với vai trò Admin).
+
+UC13: Quản Lý Trạng Thái Camera
+Mô tả: Cho phép Admin xem danh sách camera hiện được quản lý trong hệ thống. Admin có thể thay đổi trạng thái của camera (ví dụ: bật/tắt hiển thị cho người dùng, đánh dấu để bảo trì) hoặc loại bỏ hoàn toàn camera khỏi hệ thống (ví dụ: khi thiết bị bị lỗi hoặc được chuyển vị trí).
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống với vai trò Admin).
+
+UC14: Xử Lý Báo Cáo/Phản Hồi
+Mô tả: Hiển thị danh sách báo cáo/phản hồi được gửi bởi người dùng (từ UC09). Admin có thể xem chi tiết từng báo cáo, xác minh thông tin. Dựa trên kết quả xác minh, Admin có thể:
+Đánh dấu báo cáo là "Đã xác minh" (có thể bao gồm tin nhắn trả lời tự động hoặc tùy chỉnh cho người gửi).
+Đánh dấu báo cáo là "Không hợp lệ" hoặc "Bị từ chối".
+Cập nhật trạng thái xử lý (ví dụ: "Đang xử lý", "Đã giải quyết").
+Các báo cáo đã xử lý sẽ được lưu trữ theo quy định hoặc xóa nếu cần.
+Điều kiện tiên quyết: UC01 (Đăng Nhập Hệ Thống với vai trò Admin).
+
+-----------------------------------------------MÔ TẢ USE CASE CHI TIẾT --------------------------------------------------
+
+1. Use case: Đăng Nhập Hệ Thống (UC01)
+
+Trường	Mô Tả
+Tên Use Case	Đăng Nhập Hệ Thống
+Người Dùng	User, Admin
+Mô Tả	Tất cả người dùng (User và Admin) phải đăng nhập để truy cập các chức năng hệ thống. Hệ thống xác thực thông tin đăng nhập (username/email và password) so với cơ sở dữ liệu người dùng. Khi xác thực thành công, hệ thống sẽ hiển thị giao diện và chức năng phù hợp tương ứng với vai trò của người dùng (User hoặc Admin).
+Ghi chú: Mặc dù hệ thống không cung cấp giao diện tự đăng ký cho người dùng, tài khoản người dùng được tạo và quản lý qua các endpoint API backend chuyên dụng (ví dụ: `/api/auth/register`). Điều này cho phép tạo tài khoản quản trị hoặc tích hợp với các quy trình cung cấp khác.
+Điều Kiện Tiên Quyết	Người dùng đang ở màn hình đăng nhập. Tài khoản người dùng đã được tạo và lưu trữ trong cơ sở dữ liệu.
+Điều Kiện Sau	Người dùng đăng nhập thành công và được chuyển hướng đến giao diện chính tương ứng với vai trò của họ (User hoặc Admin).
+Luồng Bình Thường	1. Người dùng nhập username hoặc email.2. Người dùng nhập password.3. Người dùng click nút "Đăng nhập".4. Hệ thống xác thực thông tin đăng nhập so với cơ sở dữ liệu người dùng.5. Nếu hợp lệ, hệ thống xác định vai trò (User/Admin) và hiển thị giao diện phù hợp.
+Luồng Thay Thế	Không có.
+Ngoại Lệ	- Thông tin đăng nhập không chính xác: Hệ thống hiển thị thông báo lỗi.- Lỗi kết nối cơ sở dữ liệu: Hệ thống hiển thị thông báo lỗi hệ thống.- Tài khoản không tồn tại (do quản lý bên ngoài): Hệ thống hiển thị thông báo lỗi.
+
+2. Use case: Xem Bản Đồ Giao Thông (UC02)
+
+Trường	Mô Tả
+Tên Use Case	Xem Bản Đồ Giao Thông
+Người Dùng	User, Admin
+Mô Tả	Hiển thị bản đồ số tương tác sử dụng Leaflet với lớp phủ mật độ giao thông theo thời gian thực (heatmap).
+Cho phép zoom, pan, di chuyển bản đồ. Cho lớp phủ tắc nghẽn (heatmap) và cảnh báo tuyến đường (UC03), frontend sử dụng bán kính hiệu ứng động xung quanh mỗi marker camera. Bán kính hiệu ứng này khác biệt với ROI của camera (được backend sử dụng chỉ để đếm phương tiện) và kích thước của nó tăng theo mức độ nghiêm trọng tắc nghẽn.
+Điều Kiện Tiên Quyết	UC01: Người dùng đã đăng nhập thành công.
+Điều Kiện Sau	Người dùng có thể xem bản đồ số với thông tin mật độ giao thông cập nhật và có thể tương tác với bản đồ.
+Luồng Bình Thường	1. Người dùng truy cập chức năng bản đồ (mặc định sau khi đăng nhập hoặc qua menu).2. Hệ thống tải dữ liệu bản đồ cơ sở.3. Hệ thống (frontend) lấy dữ liệu camera bao gồm mức độ tắc nghẽn từ backend.4. Frontend tạo và hiển thị lớp phủ heatmap dựa trên mức độ tắc nghẽn camera và bán kính hiệu ứng động của chúng.5. Người dùng thực hiện các hành động zoom in, zoom out, pan để xem khu vực mong muốn.
+Luồng Thay Thế	Không có.
+Ngoại Lệ	- Lỗi tải dữ liệu bản đồ: Hiển thị thông báo lỗi hoặc bản đồ trống.- Lỗi tải dữ liệu camera/tắc nghẽn: Hiển thị bản đồ không có lớp phủ hoặc thông báo lỗi.- Mất kết nối mạng: Không thể tải hoặc cập nhật dữ liệu.
+
+3. Use case: Tìm Đường (UC03)
+
+Trường	Mô Tả
+Tên Use Case	Tìm Đường
+Người Dùng	User, Admin
+Mô Tả	Cho phép người dùng nhập điểm bắt đầu và đích đến để tìm tuyến đường di chuyển tối ưu. Người dùng có thể nhập điểm bằng cách gõ địa chỉ (với geocoding) hoặc bằng cách click trên bản đồ để đặt marker. Hệ thống sử dụng khả năng routing phía client mặc định của Leaflet để gợi ý tuyến đường. Nó cảnh báo người dùng nếu tuyến đường được gợi ý đi qua bán kính hiệu ứng động của vị trí camera đang gặp mức độ tắc nghẽn 3 trở lên. Bán kính hiệu ứng được xác định bởi frontend dựa trên mức độ nghiêm trọng tắc nghẽn.
+Điều Kiện Tiên Quyết	UC02: Người dùng đang xem bản đồ giao thông.
+Điều Kiện Sau	Hệ thống hiển thị tuyến đường được gợi ý trên bản đồ, cùng với cảnh báo (nếu có) nếu tuyến đường giao với các khu vực tắc nghẽn nghiêm trọng.
+Luồng Bình Thường	1. Người dùng kích hoạt chức năng tìm đường trên giao diện bản đồ.2. Người dùng nhập hoặc chọn điểm bắt đầu (qua tìm kiếm/geocode hoặc bằng cách click trên bản đồ để đặt marker).3. Người dùng nhập hoặc chọn điểm đích (tương tự).4. Người dùng yêu cầu hệ thống tìm tuyến đường.5. Frontend (sử dụng Leaflet routing) tính toán tuyến đường tối ưu.6. Frontend hiển thị tuyến đường trên bản đồ.7. Frontend kiểm tra nếu tuyến đường giao với bán kính hiệu ứng động của bất kỳ camera nào có mức độ tắc nghẽn 3 trở lên. Nếu có, nó hiển thị thông báo cảnh báo cho người dùng.
+Luồng Thay Thế	Không có.
+Ngoại Lệ	- Tính năng nhập/chọn vị trí không hoạt động, hoặc geocoding thất bại.- Không thể tìm tuyến đường giữa hai điểm (giới hạn dịch vụ routing).- Lỗi trong việc lấy dữ liệu tắc nghẽn camera cho cảnh báo.
+
+4. Use case: Xem Camera Thời Gian Thực (UC04)
+
+Trường	Mô Tả
+Tên Use Case	Xem Camera Thời Gian Thực
+Người Dùng	User, Admin
+Mô Tả	Cho phép người dùng chọn và xem hình ảnh trực tiếp (luồng video với fps rất thấp (1 frame mỗi 8 giây)) từ các camera giao thông được tích hợp vào hệ thống. ROI (tọa độ và kích thước được định trước) chỉ được sử dụng để đếm phương tiện, không cho lớp phủ bản đồ.
+Điều Kiện Tiên Quyết	UC01: Người dùng đã đăng nhập thành công.
+Điều Kiện Sau	Người dùng có thể xem luồng video thời gian thực từ camera đã chọn.
+Luồng Bình Thường	1. Người dùng truy cập chức năng xem camera (qua biểu tượng camera trong menu hoặc chọn biểu tượng camera trên bản đồ - UC02).2. Hệ thống hiển thị danh sách hoặc vị trí của các camera có sẵn.3. Người dùng chọn một camera cụ thể.4. Hệ thống kết nối và hiển thị luồng video từ camera đó.
+Luồng Thay Thế	Nếu đang xem bản đồ (UC02), người dùng có thể chọn trực tiếp biểu tượng camera trên bản đồ để xem.
+Ngoại Lệ	- Camera đã chọn không hoạt động hoặc đang bảo trì.- Lỗi kết nối đến nguồn luồng video.- Kết nối mạng của người dùng bị mất.- Camera không tồn tại hoặc đã bị xóa (được quản lý bởi Admin - UC13).
+
+5. Use case: Quản Lý Camera Yêu Thích (UC05)
+
+Trường	Mô Tả
+Tên Use Case	Quản Lý Camera Yêu Thích
+Người Dùng	User, Admin
+Mô Tả	Cho phép đánh dấu/bỏ đánh dấu camera là "yêu thích". Hệ thống lưu danh sách và gửi cảnh báo khi camera yêu thích vượt ngưỡng tắc nghẽn. ROI được sử dụng để đếm phương tiện; bán kính hiệu ứng được sử dụng cho cảnh báo dựa trên bản đồ.
+Điều Kiện Tiên Quyết	UC01: Người dùng đã đăng nhập thành công. Người dùng phải có thể chọn camera (ví dụ: từ danh sách, bản đồ, hoặc đang xem stream) để đánh dấu là yêu thích.
+Điều Kiện Sau	Danh sách camera yêu thích của người dùng được cập nhật (thêm hoặc xóa). Cảnh báo tắc nghẽn được kích hoạt/vô hiệu hóa cho camera tương ứng.
+Luồng Bình Thường (Thêm yêu thích)	1. Người dùng tìm camera họ muốn đánh dấu (qua danh sách, bản đồ, hoặc đang xem stream).2. Người dùng chọn tùy chọn "Đánh dấu là yêu thích" (bằng cách click vào biểu tượng trái tim xám).3. Hệ thống lưu camera này vào danh sách yêu thích của người dùng.4. Hệ thống bắt đầu giám sát mật độ giao thông tại vị trí camera này để gửi cảnh báo.
+Luồng Bình Thường (Xóa yêu thích)	1. Người dùng truy cập danh sách camera yêu thích hoặc tìm camera họ đã đánh dấu.2. Người dùng chọn tùy chọn "Bỏ đánh dấu yêu thích" (bằng cách click vào biểu tượng trái tim hồng).3. Hệ thống xóa camera khỏi danh sách yêu thích của người dùng.4. Hệ thống ngừng giám sát và gửi cảnh báo cho camera này.
+Luồng Thay Thế	Không có.
+Ngoại Lệ	- Lỗi lưu/xóa thông tin yêu thích vào cơ sở dữ liệu.- Lỗi trong hệ thống cảnh báo (thất bại trong việc gửi hoặc gửi không chính xác).
+
+6. Use case: Xem Dự Báo Giao Thông (UC06)
+
+Trường	Mô Tả
+Tên Use Case	Xem Dự Báo Giao Thông
+Người Dùng	User, Admin
+Mô Tả	Hiển thị thông tin dự báo tình trạng giao thông cho các khu vực cụ thể (ban đầu là vị trí cố định, có thể mở rộng). Người dùng có thể chọn khoảng thời gian dự báo (ví dụ: 15 phút, 1 giờ, 2 giờ, 6 giờ). Hệ thống sử dụng mô hình machine learning Keras đã huấn luyện trước và file scaler liên quan (.pkl), dành riêng cho khoảng thời gian đã chọn, để tạo dự báo. Dữ liệu đầu vào cho mô hình (ví dụ: các mẫu giao thông tổng hợp gần đây) được chuẩn bị bởi backend. Dự báo, bao gồm mức độ tắc nghẽn dự đoán hoặc tốc độ giao thông, được trình bày cho người dùng, thường dưới dạng biểu đồ chuỗi thời gian.
+Điều Kiện Tiên Quyết	UC01 (Đăng Nhập Hệ Thống).
+Điều Kiện Sau	Người dùng có thể xem thông tin dự báo giao thông cho khu vực và thời gian đã chọn.
+Luồng Bình Thường	1. Người dùng truy cập chức năng dự báo giao thông (qua dashboard trên trang chủ).2. Hệ thống sử dụng vị trí dự báo được cấu hình sẵn (ví dụ: "Đường Mai Chí Thọ - đầu hầm Thủ Thiêm") mà dự đoán có sẵn.3. Người dùng chọn khung thời gian dự báo mong muốn (ví dụ: 30 phút tới, 1 giờ tới).4. Hệ thống truy vấn mô hình dự đoán (được chọn bởi Admin - UC12) với các tham số đã chọn.5. Hệ thống hiển thị kết quả dự báo (ví dụ: bản đồ với màu dự báo, biểu đồ dự báo).
+Luồng Thay Thế	Hệ thống có thể hiển thị dự báo chung cho toàn thành phố hoặc các tuyến đường chính mà không yêu cầu người dùng chọn cụ thể.
+Ngoại Lệ	- Mô hình dự đoán không khả dụng hoặc hiện đang huấn luyện lại (UC12).- Lỗi kết nối đến dịch vụ dự báo.- Dữ liệu lịch sử/hiện tại không đủ để tạo dự báo đáng tin cậy.
+
+UC06 - XEM DỰ BÁO GIAO THÔNG
+───────────────────────────
+BẢNG ĐIỀU KHIỂN DỰ ĐOÁN
+• Lựa chọn vị trí (hiện cố định tại "Đường Mai Chí Thọ - đầu hầm Thủ Thiêm")
+• Bộ chọn khoảng thời gian dự đoán với các tùy chọn trực quan:
+  - Dự đoán xu hướng (vài giờ tới (6/12), xu hướng cải thiện/xấu đi)
+• Tùy chọn hiển thị có thể cấu hình
+
+HIỂN THỊ DỰ BÁO ĐA DẠNG
+• View biểu đồ chính:
+  - Khoảng tin cậy hiển thị độ không chắc chắn của dự đoán
+• Hiển thị bổ sung:
+
+TRIỂN KHAI KỸ THUẬT
+• Frontend gọi endpoint `/forecasts/` với các tham số đã chọn
+• Pipeline backend:
+
+7. Use case: Xem Tin Tức & Thời Tiết (UC07)
+
+Trường	Mô Tả
+Tên Use Case	Xem Tin Tức & Thời Tiết
+Người Dùng	User, Admin
+Mô Tả	Hiển thị tin tức giao thông mới nhất và thời tiết hiện tại tại khu vực được định trước.
+Điều Kiện Tiên Quyết	UC01: Người dùng đã đăng nhập thành công.
+Điều Kiện Sau	Người dùng có thể xem danh sách tin tức liên quan đến giao thông và thông tin thời tiết.
+Luồng Bình Thường	1. Người dùng truy cập phần "Tin Tức & Thời Tiết".2. Hệ thống tải và hiển thị danh sách tin tức mới nhất từ các nguồn được cấu hình.3. Hệ thống tải và hiển thị thông tin thời tiết cho vị trí được định trước.4. Người dùng có thể chọn đọc chi tiết của một mục tin tức.
+Luồng Thay Thế	Không có.
+Ngoại Lệ	- Lỗi kết nối đến nguồn tin tức.- Lỗi kết nối đến dịch vụ thông tin thời tiết.- Mất kết nối mạng.
+
+8. Use case: Quản Lý Tài Khoản Cá Nhân (UC08)
+
+Trường	Mô Tả
+Tên Use Case	Quản Lý Tài Khoản Cá Nhân
+Người Dùng	User, Admin
+Mô Tả	Cho phép người dùng xem và cập nhật thông tin cá nhân cơ bản được phép thay đổi (ví dụ: tên hiển thị, mật khẩu).
+Điều Kiện Tiên Quyết	UC01: Người dùng đã đăng nhập thành công.
+Điều Kiện Sau	Thông tin cá nhân của người dùng (tên hiển thị, mật khẩu) được cập nhật trong hệ thống nếu có thay đổi.
+Luồng Bình Thường (Xem Thông Tin)	1. Người dùng truy cập phần "Tài Khoản" hoặc "Hồ Sơ Cá Nhân".2. Hệ thống hiển thị thông tin cá nhân hiện tại mà người dùng được phép xem (ví dụ: username/email, tên hiển thị).
+Luồng Bình Thường (Cập Nhật Thông Tin)	1. Người dùng chọn chức năng "Chỉnh sửa" hoặc "Đổi Mật Khẩu".2. Người dùng nhập thông tin mới (tên hiển thị mới, mật khẩu cũ, mật khẩu mới, xác nhận mật khẩu mới).3. Người dùng click nút "Lưu" hoặc "Cập Nhật".4. Hệ thống kiểm tra tính hợp lệ (ví dụ: lỗi: tài khoản đã tồn tại, mật khẩu cũ/mật khẩu mới giống nhau, v.v.).5. Nếu hợp lệ, hệ thống cập nhật thông tin trong cơ sở dữ liệu người dùng.6. Hệ thống thông báo cập nhật thành công.
+Luồng Thay Thế	Không có.

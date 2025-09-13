@@ -1,0 +1,108 @@
+# Danh Sách API Endpoints Backend
+
+## Endpoints Toàn Cầu (được định nghĩa trong backendv3/app/main.py)
+- GET /
+- GET /health
+- Mount file tĩnh:
+  - /assets/* (phục vụ file từ backendv3/assets)
+  - /static/* (phục vụ file từ backendv3/static)
+
+## Endpoints Xác Thực (từ backendv3/auth/router.py với prefix /api/auth)
+- POST /api/auth/login
+- POST /api/auth/refresh
+- GET /api/auth/me
+- PUT /api/auth/me/password
+- POST /api/auth/register
+- POST /api/auth/logout
+
+## Endpoints User & Admin (tất cả endpoints có thể truy cập bởi user cũng có thể truy cập bởi admin)
+# Các endpoints /api/users sau cho xác thực hiện được xử lý bởi /api/auth:
+# - POST /api/users/login (Sử dụng /api/auth/login)
+# - POST /api/users/refresh (Sử dụng /api/auth/refresh)
+# - GET /api/users/me (Sử dụng /api/auth/me)
+# - PUT /api/users/me/password (Sử dụng /api/auth/me/password)
+# - POST /api/users/register (Sử dụng /api/auth/register)
+# - POST /api/users/logout (Sử dụng /api/auth/logout)
+
+## Endpoints Camera
+- GET /api/cameras
+- GET /api/cameras/{camera_id}
+- GET /api/admin/cameras
+- POST /api/admin/cameras
+  - Body: `name` (string, bắt buộc), `stream_url` (HttpUrl, bắt buộc), `status` (string, bắt buộc, ví dụ: "Active"), `description` (string, tùy chọn), 
+  - `location_id` (string, tùy chọn, ObjectId của location đã tồn tại), HOẶC 
+  - `location_data` (object, tùy chọn, để tạo location mới): 
+    - `latitude` (float, bắt buộc trong location_data)
+    - `longitude` (float, bắt buộc trong location_data)
+    - `name` (string, tùy chọn trong location_data)
+  - Ghi chú: Cung cấp `location_id` HOẶC `location_data`, không phải cả hai. Nếu không có, camera không có vị trí cụ thể.
+- GET /api/admin/cameras/{camera_id}
+- PUT /api/admin/cameras/{camera_id}
+  - Body: Có thể bao gồm `name`, `stream_url`, `status`, `description`, `location_id`, hoặc `location_data` (tương tự POST).
+- DELETE /api/admin/cameras/{camera_id}
+- PUT /api/admin/cameras/{camera_id}/status
+- PUT /api/admin/cameras/{camera_id}/roi
+- GET /api/admin/cameras/{camera_id}/capture-frame
+- POST /api/cameras/refresh-all-thumbnails
+- POST /api/cameras/calculate-all-congestion
+
+## Endpoints Yêu Thích
+- GET /api/user/favorites
+- POST /api/user/favorites
+- DELETE /api/user/favorites/{camera_id}
+- GET /api/user/favorites/check/{camera_id}
+
+## Endpoints Báo Cáo
+- POST /api/reports
+  - Body (multipart/form-data):
+    - `report_title` (string, bắt buộc)
+    - `report_description` (string, bắt buộc)
+    - `report_type` (string, bắt buộc, ví dụ: "incident", "infrastructure")
+    - `location_id` (string, tùy chọn, ObjectId của location đã tồn tại)
+    - `location_name` (string, tùy chọn, nếu tạo location mới)
+    - `location_latitude` (float, tùy chọn, nếu tạo location mới)
+    - `location_longitude` (float, tùy chọn, nếu tạo location mới)
+    - `image` (file, tùy chọn)
+  - Ghi chú: Cho location, cung cấp `location_id` HOẶC (`location_latitude` VÀ `location_longitude`, với `location_name` tùy chọn).
+- GET /api/reports/my-reports
+- GET /api/reports/{report_id}
+- GET /api/admin/reports
+- PATCH /api/admin/reports/{report_id}
+- GET /api/admin/notifications
+- PATCH /api/admin/notifications/{notification_id}/read
+
+## Endpoints Quản Lý Dữ Liệu Huấn Luyện
+- POST /api/admin/training-data/upload
+- GET /api/admin/training-data/
+- GET /api/admin/training-data/{dataset_id}
+- DELETE /api/admin/training-data/{dataset_id}
+- POST /api/admin/training-data/{dataset_id}/initiate-video-processing
+- POST /api/admin/training-data/initiate-ml-dataset-creation
+
+## Endpoints Quản Lý Mô Hình Dự Đoán
+- POST /api/admin/prediction-models/
+- GET /api/admin/prediction-models/
+- GET /api/admin/prediction-models/{model_id}
+- PUT /api/admin/prediction-models/{model_id}
+- DELETE /api/admin/prediction-models/{model_id}
+- POST /api/admin/prediction-models/{model_id}/initiate-retraining
+- POST /api/admin/prediction-models/{model_id}/set-default
+
+## Endpoints Dự Báo Giao Thông
+- GET /api/forecasts/
+  - Mô tả: Lấy dự báo giao thông cho vị trí cố định ("Đường Mai Chí Thọ - đầu hầm Thủ Thiêm") sử dụng mô hình dự đoán mặc định. Query: time_horizon_minutes, location_name (tùy chọn, hiện bị bỏ qua).
+
+## Endpoints Xử Lý Video
+- POST /api/video/process-video/
+- GET /api/video/task-status/{task_id}
+- GET /api/video/processed-data/{task_id}
+
+## Endpoints Tiện Ích Chung
+- GET /api/utils/system-status
+- POST /api/utils/cleanup-old-data
+
+# Ghi Chú:
+- Admin là super user: tất cả endpoints của user đều có thể truy cập bởi admin, nhưng không phải tất cả endpoints admin đều có thể truy cập bởi user.
+- Metadata camera bao gồm cấu hình ROI để đếm phương tiện; bán kính hiệu ứng cho overlay được tính toán trên frontend.
+- Dữ liệu tắc nghẽn thời gian thực không được lưu trữ; chỉ dữ liệu hàng loạt/đã xử lý được lưu trữ cho phân tích và ML.
+- Tất cả endpoints và models nên được kiểm tra chéo với Thiết Kế Cơ Sở Dữ Liệu đã hoàn thiện, Thông Số Kỹ Thuật Hệ Thống, và Mô Tả Use Case để đảm bảo tính nhất quán.

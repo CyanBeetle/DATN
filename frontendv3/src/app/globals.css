@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* leaflet-routing-machine itinerary background */
+.leaflet-routing-itinerary {
+  background-color: rgba(255, 255, 255, 0.9) !important; /* Adjust opacity as needed */
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-height: 400px; /* Adjust as needed */
+  overflow-y: auto;
+}
+
+/* You might also want to style the overall container if the above is too specific or doesn't cover everything */
+.leaflet-routing-container {
+  background-color: rgba(255, 255, 255, 0.9) !important; /* Adjust opacity as needed */
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-height: 600px; /* Adjust as needed, can be different from itinerary */
+  overflow-y: auto;
+}
+
+/* Style for individual instruction steps for better readability */
+.leaflet-routing-instruction {
+  color: #333; /* Darker text color for instructions */
+}
+
+.leaflet-routing-alt {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    max-height: 300px; /* Adjust as needed */
+    overflow-y: auto;
+}
